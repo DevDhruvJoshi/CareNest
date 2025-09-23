@@ -9,3 +9,8 @@ privacy:
   local_processing: true
   no_internet: true
 
+api:
+  base_url: http://localhost:4000
+  ingest_token: dev-ingest-token
+
+

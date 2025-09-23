@@ -22,6 +22,17 @@ export function setupWebSocket(server: Server) {
       }
     });
   });
+
+  // periodic health broadcast
+  setInterval(() => {
+    const payload = {
+      status: 'ok',
+      uptimeMs: Math.round(process.uptime() * 1000),
+      memory: process.memoryUsage(),
+      ts: Date.now(),
+    };
+    broadcast('health_update', payload);
+  }, 5000);
 }
 
 export function broadcast(event: string, payload: unknown) {

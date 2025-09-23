@@ -1,10 +1,26 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
 import yaml
 import os
+import threading
+import time
+from typing import Optional, Dict, Any
+from fastapi.middleware.cors import CORSMiddleware
+import requests
+try:
+    import mediapipe as mp  # type: ignore
+except Exception:
+    mp = None  # type: ignore
+
+try:
+    import cv2  # type: ignore
+    import numpy as np  # type: ignore
+except Exception:
+    cv2 = None  # type: ignore
+    np = None  # type: ignore
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -24,6 +40,15 @@ def load_config() -> dict:
 
 
 app = FastAPI(title="CareNest Enterprise")
+
+# CORS for web app (adjust origins as needed)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 static_dir = BASE_DIR / "static"
@@ -93,4 +118,253 @@ def post_alert(alert: Alert):
     # stub: log or enqueue alert
     return {"accepted": True, "level": alert.level}
 
+############################
+# RTSP ingest minimal stub #
+############################
+
+class CameraState(BaseModel):
+    url: str
+    last_frame_ts: Optional[float] = None
+    motion: bool = False
+    fall: bool = False
+
+_camera_threads: Dict[str, threading.Thread] = {}
+_camera_state: Dict[str, CameraState] = {}
+_stop_flags: Dict[str, bool] = {}
+_last_frames: Dict[str, Any] = {}
+_last_health: Dict[str, float] = {}
+
+
+def _process_stream(cam_id: str, url: str, fps: int = 10):
+    if cv2 is None:
+        return
+    cap = None
+    prev_gray = None
+    interval = 1.0 / max(fps, 1)
+    backoff = 1.0
+    pose = None
+    if mp is not None:
+        try:
+            pose = mp.solutions.pose.Pose(static_image_mode=False, model_complexity=0, enable_segmentation=False)
+        except Exception:
+            pose = None
+    frame_count = 0
+    while not _stop_flags.get(cam_id, False):
+        if cap is None or not cap.isOpened():
+            try:
+                cap = cv2.VideoCapture(url)
+            except Exception:
+                cap = None
+            if cap is None or not cap.isOpened():
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 30.0)
+                continue
+            backoff = 1.0
+        ok, frame = cap.read()
+        now = time.time()
+        st = _camera_state.get(cam_id)
+        if not ok:
+            # try reopen stream
+            if cap is not None:
+                cap.release()
+            cap = None
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30.0)
+            continue
+        _last_frames[cam_id] = frame
+        if st:
+            st.last_frame_ts = now
+            _last_health[cam_id] = now
+        try:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            gray = cv2.GaussianBlur(gray, (9, 9), 0)
+            motion = False
+            if prev_gray is not None:
+                diff = cv2.absdiff(prev_gray, gray)
+                _, th = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
+                motion_pixels = int(np.sum(th > 0)) if np is not None else 0
+                motion = motion_pixels > 5000
+            prev_gray = gray
+            if st:
+                st.motion = motion
+                # naive fall heuristic placeholder: if strong vertical edges + motion
+                st.fall = bool(motion)
+
+                # mediapipe pose heuristic (if available) every 5th frame
+                frame_count += 1
+                if pose is not None and frame_count % 5 == 0:
+                    try:
+                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        res = pose.process(rgb)
+                        if res and res.pose_landmarks:
+                            lm = res.pose_landmarks.landmark
+                            # landmarks indices
+                            nose = lm[0]
+                            left_hip = lm[23]
+                            right_hip = lm[24]
+                            cx = (left_hip.x + right_hip.x) / 2.0
+                            cy = (left_hip.y + right_hip.y) / 2.0
+                            # if nose is vertically close to hips (fallen) and motion just occurred
+                            if motion and (nose.y - cy) > -0.05:  # nose not much above hips
+                                st.fall = True
+                    except Exception:
+                        pass
+                # post events to API
+                try:
+                    api = os.getenv('API_URL', 'http://localhost:4000')
+                    ingest = os.getenv('INGEST_TOKEN', '')
+                    if motion:
+                        requests.post(f"{api}/alerts/events", json={"cameraId": cam_id, "type": "motion"}, headers={"x-ingest-token": ingest}, timeout=1.5)
+                    if st.fall:
+                        requests.post(f"{api}/alerts/events", json={"cameraId": cam_id, "type": "fall"}, headers={"x-ingest-token": ingest}, timeout=1.5)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        time.sleep(interval)
+    cap.release()
+
+
+class StartCameraReq(BaseModel):
+    id: str
+    url: str
+
+
+@app.post("/api/camera/start")
+def start_camera(req: StartCameraReq):
+    cam_id = req.id
+    if cam_id in _camera_threads and _camera_threads[cam_id].is_alive():
+        return {"running": True}
+    _stop_flags[cam_id] = False
+    _camera_state[cam_id] = CameraState(url=req.url)
+    t = threading.Thread(target=_process_stream, args=(cam_id, req.url), daemon=True)
+    _camera_threads[cam_id] = t
+    t.start()
+    return {"started": True}
+
+
+class StopCameraReq(BaseModel):
+    id: str
+
+
+@app.post("/api/camera/stop")
+def stop_camera(req: StopCameraReq):
+    cam_id = req.id
+    _stop_flags[cam_id] = True
+    return {"stopping": True}
+
+
+@app.get("/api/camera/{cam_id}/state")
+def camera_state(cam_id: str):
+    st = _camera_state.get(cam_id)
+    if not st:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return st.model_dump()
+
+
+@app.get("/api/camera/{cam_id}/snapshot")
+def camera_snapshot(cam_id: str):
+    if cv2 is None:
+        return JSONResponse({"error": "cv2 not available"}, status_code=503)
+    frame = _last_frames.get(cam_id)
+    if frame is None:
+        return JSONResponse({"error": "no frame"}, status_code=404)
+    ok, buf = cv2.imencode('.jpg', frame)
+    if not ok:
+        return JSONResponse({"error": "encode failed"}, status_code=500)
+    return Response(content=buf.tobytes(), media_type='image/jpeg')
+
+
+#########################
+# Health analytics basic #
+#########################
+
+@app.get("/api/health-analytics")
+def health_analytics():
+    # Aggregate simple signals from camera states; extend later with ML
+    cams = []
+    for cam_id, st in _camera_state.items():
+        cams.append({
+            "id": cam_id,
+            "motion": st.motion,
+            "fall": st.fall,
+            "lastFrameAgoSec": (time.time() - st.last_frame_ts) if st.last_frame_ts else None,
+        })
+    summary = {
+        "cameras": cams,
+        "anyMotion": any(c.get("motion") for c in cams) if cams else False,
+        "anyFall": any(c.get("fall") for c in cams) if cams else False,
+        "ts": time.time(),
+    }
+    return summary
+
+
+#########################
+# Watchdog & Backups    #
+#########################
+
+def _watchdog_loop():
+    while True:
+        now = time.time()
+        for cam_id, st in list(_camera_state.items()):
+            last = st.last_frame_ts or 0
+            if now - last > 10:  # stale >10s → restart
+                try:
+                    _stop_flags[cam_id] = True
+                    time.sleep(0.5)
+                    _stop_flags[cam_id] = False
+                    t = threading.Thread(target=_process_stream, args=(cam_id, st.url), daemon=True)
+                    _camera_threads[cam_id] = t
+                    t.start()
+                except Exception:
+                    pass
+        time.sleep(5)
+
+def _snapshot_backup_loop():
+    backup_dir = BASE_DIR / 'storage' / 'snapshots'
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    retention = 100
+    while True:
+        for cam_id, frame in list(_last_frames.items()):
+            try:
+                if cv2 is None:
+                    continue
+                ok, buf = cv2.imencode('.jpg', frame)
+                if not ok:
+                    continue
+                ts = int(time.time())
+                path = backup_dir / f"{cam_id}-{ts}.jpg"
+                with open(path, 'wb') as f:
+                    f.write(buf.tobytes())
+            except Exception:
+                pass
+        # retention
+        try:
+            files = sorted([p for p in backup_dir.glob('*.jpg')], key=lambda p: p.stat().st_mtime, reverse=True)
+            for p in files[retention:]:
+                try:
+                    p.unlink(missing_ok=True)  # type: ignore
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        time.sleep(60)
+
+_watchdog_thread = threading.Thread(target=_watchdog_loop, daemon=True)
+_watchdog_thread.start()
+_backup_thread = threading.Thread(target=_snapshot_backup_loop, daemon=True)
+_backup_thread.start()
+
+
+@app.get('/api/camera')
+def list_cameras():
+    out = []
+    now = time.time()
+    for cam_id, st in _camera_state.items():
+        out.append({
+            'id': cam_id,
+            'url': st.url,
+            'lastFrameAgoSec': (now - (st.last_frame_ts or 0)) if st.last_frame_ts else None,
+        })
+    return {'items': out}
 
