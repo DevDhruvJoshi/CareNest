@@ -1,3 +1,47 @@
+name: build
+
+on:
+  push:
+    branches:
+      - dev
+      - feat/**
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Show versions
+        run: |
+          node -v
+          npm -v
+
+      - name: Install dependencies (workspaces)
+        run: npm install --no-audit --no-fund
+
+      - name: Prisma generate
+        run: npm run -w packages/db prisma:generate
+
+      - name: Build db package
+        run: npm run -w packages/db build
+
+      - name: Build API
+        run: npm run -w apps/api build
+
+      - name: Build Web
+        run: npm run -w apps/web build
+
 name: CI
 
 on:
