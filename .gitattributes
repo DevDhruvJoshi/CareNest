@@ -1,4 +1,15 @@
 * text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+* text=auto eol=lf
 *.ts diff=ts
 *.tsx diff=ts
 *.md linguist-detectable=true

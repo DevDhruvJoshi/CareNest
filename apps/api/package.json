@@ -9,7 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@carenest/db": "workspace:*",
+    "@carenest/db": "file:../../packages/db",
     "ws": "^8.18.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
