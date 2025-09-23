@@ -13,6 +13,7 @@ Monorepo for CareNest backend (API), frontend (web), and shared packages.
 - Node.js 18+
 - npm 9+
 - Docker (optional for local DB)
+ - Optional: OpenAI account and API key if you use the AI planning endpoint
 
 ## Getting Started
 
@@ -24,6 +25,7 @@ Monorepo for CareNest backend (API), frontend (web), and shared packages.
 
 - API (`apps/api`): `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`
 - Web (`apps/web`): `NEXT_PUBLIC_API_URL`
+ - API LLM (optional): `OPENAI_API_KEY`, `OPENAI_MODEL` (default: `gpt-4o-mini`)
 - Samples: `apps/api/env.sample`, `apps/web/env.sample`
 
 ### Env & Config Strategy
@@ -59,12 +61,34 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/carenest
 # ALERT_EMAIL_SMTP_PORT=587
 # ALERT_EMAIL_SMTP_USER=username
 # ALERT_EMAIL_SMTP_PASS=password
+
+# Optional LLM keys
+# OPENAI_API_KEY=sk-...
+# OPENAI_MODEL=gpt-4o-mini
 ```
 
 Web `.env.local` (apps/web/.env.local):
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:4000
+
+### AI Planning Endpoint (optional)
+
+- Route: `POST /ai/plan`
+- Request body (all fields optional):
+
+```
+{
+  "rpiHostname": "raspberrypi.local",
+  "vpsHost": "your.vps.example.com",
+  "vpsUser": "ubuntu",
+  "remotePort": 5000,
+  "localPort": 5000,
+  "sshPort": 22
+}
+```
+
+- Response: `{ plan: string }` generated using `Prompts/IDE_AI_IMPLEMENTATION_PROMPT.md` master prompt.
 ```
 
 ### Notes
