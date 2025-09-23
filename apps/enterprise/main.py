@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
@@ -10,6 +10,8 @@ import time
 from typing import Optional, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
 import requests
+import subprocess
+import shutil
 try:
     import mediapipe as mp  # type: ignore
 except Exception:
@@ -57,6 +59,32 @@ static_dir.mkdir(parents=True, exist_ok=True)
 templates_dir.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+#########################
+# Prometheus /metrics    #
+#########################
+_process_start = time.time()
+_request_count = 0
+
+@app.middleware("http")
+async def _metrics_middleware(request: Request, call_next):
+    global _request_count
+    _request_count += 1
+    return await call_next(request)
+
+@app.get("/metrics")
+def metrics():
+    uptime = time.time() - _process_start
+    # Basic text exposition format
+    content = []
+    content.append("# HELP app_uptime_seconds Process uptime in seconds")
+    content.append("# TYPE app_uptime_seconds counter")
+    content.append(f"app_uptime_seconds {uptime:.0f}")
+    content.append("# HELP app_requests_total Total HTTP requests")
+    content.append("# TYPE app_requests_total counter")
+    content.append(f"app_requests_total {_request_count}")
+    return PlainTextResponse("\n".join(content) + "\n")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -133,6 +161,7 @@ _camera_state: Dict[str, CameraState] = {}
 _stop_flags: Dict[str, bool] = {}
 _last_frames: Dict[str, Any] = {}
 _last_health: Dict[str, float] = {}
+_hls_procs: Dict[str, subprocess.Popen] = {}
 
 
 def _process_stream(cam_id: str, url: str, fps: int = 10):
@@ -149,6 +178,10 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
         except Exception:
             pose = None
     frame_count = 0
+    motion_threshold = 8000  # pixels
+    fall_nose_hip_delta = 0.02  # normalized y distance threshold
+    fall_debounce_sec = 3.0
+    last_fall_ts = 0.0
     while not _stop_flags.get(cam_id, False):
         if cap is None or not cap.isOpened():
             try:
@@ -171,6 +204,29 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
             time.sleep(backoff)
             backoff = min(backoff * 2, 30.0)
             continue
+        # Face blurring if enabled
+        try:
+            cfg = load_config()
+            blur_enabled = bool(cfg.get('privacy', {}).get('face_blur', False))
+        except Exception:
+            blur_enabled = False
+        if blur_enabled and cv2 is not None:
+            try:
+                gray_face = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                # Use default haarcascade if available in cv2 data
+                cascade_path = getattr(cv2, 'data', None)
+                if cascade_path and hasattr(cascade_path, 'haarcascades'):
+                    cascade_file = cascade_path.haarcascades + 'haarcascade_frontalface_default.xml'
+                else:
+                    cascade_file = (Path(cv2.__file__).resolve().parent / 'data' / 'haarcascade_frontalface_default.xml').as_posix()  # type: ignore
+                face_cascade = cv2.CascadeClassifier(cascade_file)
+                faces = face_cascade.detectMultiScale(gray_face, 1.2, 5)
+                for (x, y, w, h) in faces:
+                    roi = frame[y:y+h, x:x+w]
+                    roi = cv2.GaussianBlur(roi, (31, 31), 0)
+                    frame[y:y+h, x:x+w] = roi
+            except Exception:
+                pass
         _last_frames[cam_id] = frame
         if st:
             st.last_frame_ts = now
@@ -183,7 +239,7 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                 diff = cv2.absdiff(prev_gray, gray)
                 _, th = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
                 motion_pixels = int(np.sum(th > 0)) if np is not None else 0
-                motion = motion_pixels > 5000
+                motion = motion_pixels > motion_threshold
             prev_gray = gray
             if st:
                 st.motion = motion
@@ -204,9 +260,18 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                             right_hip = lm[24]
                             cx = (left_hip.x + right_hip.x) / 2.0
                             cy = (left_hip.y + right_hip.y) / 2.0
-                            # if nose is vertically close to hips (fallen) and motion just occurred
-                            if motion and (nose.y - cy) > -0.05:  # nose not much above hips
-                                st.fall = True
+                            # Compute body tilt using shoulders if available
+                            left_shoulder = lm[11]
+                            right_shoulder = lm[12]
+                            shoulder_angle = abs(left_shoulder.y - right_shoulder.y)
+                            # if nose is close to hips (vertical collapse) and recent motion
+                            nose_delta = cy - nose.y  # positive if nose below hips
+                            likely_fall = motion and (nose_delta < fall_nose_hip_delta)
+                            if likely_fall:
+                                # debounce to reduce duplicates
+                                if (now - last_fall_ts) > fall_debounce_sec:
+                                    st.fall = True
+                                    last_fall_ts = now
                     except Exception:
                         pass
                 # post events to API
@@ -214,15 +279,78 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                     api = os.getenv('API_URL', 'http://localhost:4000')
                     ingest = os.getenv('INGEST_TOKEN', '')
                     if motion:
-                        requests.post(f"{api}/alerts/events", json={"cameraId": cam_id, "type": "motion"}, headers={"x-ingest-token": ingest}, timeout=1.5)
+                        requests.post(
+                            f"{api}/alerts/events",
+                            json={
+                                "cameraId": cam_id,
+                                "type": "motion",
+                                "details": {"motionPixels": motion_pixels},
+                            },
+                            headers={"x-ingest-token": ingest},
+                            timeout=1.5,
+                        )
                     if st.fall:
-                        requests.post(f"{api}/alerts/events", json={"cameraId": cam_id, "type": "fall"}, headers={"x-ingest-token": ingest}, timeout=1.5)
+                        requests.post(
+                            f"{api}/alerts/events",
+                            json={
+                                "cameraId": cam_id,
+                                "type": "fall",
+                                "details": {
+                                    "noseHipDelta": float(nose_delta) if 'nose_delta' in locals() else None,
+                                    "shoulderAngle": float(shoulder_angle) if 'shoulder_angle' in locals() else None,
+                                },
+                            },
+                            headers={"x-ingest-token": ingest},
+                            timeout=1.5,
+                        )
                 except Exception:
                     pass
         except Exception:
             pass
         time.sleep(interval)
     cap.release()
+
+
+def _start_hls(cam_id: str, url: str):
+    # Requires ffmpeg in PATH
+    if _hls_procs.get(cam_id) and _hls_procs[cam_id].poll() is None:
+        return True
+    hls_root = BASE_DIR / 'static' / 'hls' / cam_id
+    hls_root.mkdir(parents=True, exist_ok=True)
+    # clean old segments
+    for p in list(hls_root.glob('*')):
+        try:
+            p.unlink(missing_ok=True)  # type: ignore
+        except Exception:
+            pass
+    playlist = hls_root / 'index.m3u8'
+    # Basic ffmpeg HLS; tune as needed
+    cmd = [
+        'ffmpeg', '-y',
+        '-rtsp_transport', 'tcp',
+        '-i', url,
+        '-an',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-pix_fmt', 'yuv420p',
+        '-max_muxing_queue_size', '1024',
+        '-f', 'hls', '-hls_time', '2', '-hls_list_size', '6', '-hls_flags', 'delete_segments+append_list',
+        str(playlist)
+    ]
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _hls_procs[cam_id] = proc
+        return True
+    except Exception:
+        return False
+
+
+def _stop_hls(cam_id: str):
+    proc = _hls_procs.get(cam_id)
+    if proc and proc.poll() is None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    _hls_procs.pop(cam_id, None)
 
 
 class StartCameraReq(BaseModel):
@@ -240,6 +368,8 @@ def start_camera(req: StartCameraReq):
     t = threading.Thread(target=_process_stream, args=(cam_id, req.url), daemon=True)
     _camera_threads[cam_id] = t
     t.start()
+    # Try to start HLS alongside processing
+    _start_hls(cam_id, req.url)
     return {"started": True}
 
 
@@ -251,6 +381,7 @@ class StopCameraReq(BaseModel):
 def stop_camera(req: StopCameraReq):
     cam_id = req.id
     _stop_flags[cam_id] = True
+    _stop_hls(cam_id)
     return {"stopping": True}
 
 
@@ -273,6 +404,15 @@ def camera_snapshot(cam_id: str):
     if not ok:
         return JSONResponse({"error": "encode failed"}, status_code=500)
     return Response(content=buf.tobytes(), media_type='image/jpeg')
+
+
+@app.get('/api/camera/{cam_id}/hls')
+def camera_hls(cam_id: str):
+    # Return the HLS playlist path for the client
+    playlist = BASE_DIR / 'static' / 'hls' / cam_id / 'index.m3u8'
+    if not playlist.exists():
+        return JSONResponse({"error": "hls not ready"}, status_code=404)
+    return JSONResponse({"m3u8": f"/static/hls/{cam_id}/index.m3u8"})
 
 
 #########################

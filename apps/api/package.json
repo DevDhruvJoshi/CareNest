@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@carenest/db": "file:../../packages/db",
+    "prom-client": "^15.1.2",
     "nodemailer": "^6.9.15",
     "express-rate-limit": "^7.4.0",
     "ws": "^8.18.0",
