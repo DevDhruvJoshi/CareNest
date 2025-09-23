@@ -73,7 +73,7 @@ export async function sendAlert(payload: AlertPayload): Promise<{ ok: boolean }>
     channel,
     to: payload.to || null,
     status: 'sent',
-    meta: null,
+    // do not set meta when not needed to avoid null JSON typing issues
   }}).catch(() => {});
   return { ok: true };
 }
