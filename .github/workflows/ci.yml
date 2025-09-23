@@ -18,8 +18,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: Use npm@10
-        run: npm i -g npm@10
+      - name: Enforce npm@10
+        run: |
+          npm i -g npm@10
+          npm --version
 
       - name: Show versions
         run: |
