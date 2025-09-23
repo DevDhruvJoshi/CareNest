@@ -1,0 +1,9 @@
+# Shell Usage in CI and Local
+
+- On Windows PowerShell, avoid `&&`; run commands separately.
+- Prefer workspace-scoped commands over complex shells:
+  - `npm run -w <workspace> <script>`
+- Never rely on interactive prompts. Use flags like `--no-audit --no-fund`.
+- For long logs in Linux, avoid piping to `cat` in CI; GitHub captures logs already.
+- Keep env explicit when needed:
+  - `CI=true NEXT_TELEMETRY_DISABLED=1 <command>`

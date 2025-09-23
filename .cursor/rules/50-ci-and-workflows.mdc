@@ -1,0 +1,50 @@
+# CI/CD Workflow Rules
+
+These rules harden our GitHub Actions and prevent common monorepo issues.
+
+- Always use Node 20 on CI: setup-node@v4 with `node-version: 20`.
+- Do NOT enable `cache: npm` unless a lockfile exists (package-lock.json). If no lockfile, run `npm install --no-audit --no-fund`.
+- Monorepo steps:
+  - Install once at repo root.
+  - Generate Prisma client before builds:
+    - `npm run -w packages/db prisma:generate`
+    - Provide `DATABASE_URL` (use a dummy local URL if DB not used during build).
+  - Build workspaces explicitly:
+    - `npm run -w apps/api build`
+    - `npm run -w apps/web build`
+- Set environment on CI to be non-interactive:
+  - `CI: true`
+  - `NEXT_TELEMETRY_DISABLED: 1`
+- Trigger CI on `main` and `dev` for both push and PR.
+- Do not use `npm ci` unless the repository maintains a lockfile in root.
+- Keep workflows minimal; avoid extra caching until a lockfile is introduced.
+
+Example baseline job:
+
+```
+name: CI
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+        env:
+          CI: true
+          NEXT_TELEMETRY_DISABLED: 1
+      - run: npm run -w packages/db prisma:generate
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/carenest
+      - run: npm run -w apps/api build
+      - run: npm run -w apps/web build
+```
+
+Release/Deploy workflows must not leak secrets; use GitHub Environments with required reviewers.
