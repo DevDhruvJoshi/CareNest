@@ -1,33 +1,35 @@
-# Cursor Rules for CareNest
+# Cursor Rules for CareNest (canonical)
+
+This file is the canonical source of project rules. Keep `.cursor/rules.md` in sync so Cursor can surface them inside the workspace.
 
 ## Environments
-- Always target Node 20 and npm 10.
+- Node 20 and npm 10 required.
 - Do not downgrade npm; workspace protocol must be supported.
 
 ## Dependencies & Installs
-- Prefer workspace-aware installs. At repo root use: `npm install --workspaces --include-workspace-root`.
-- Lockfile: prefer committing `package-lock.json`; if not present, do not enable cache in CI.
+- Prefer workspace-aware installs at repo root: `npm install --workspaces --include-workspace-root`.
+- Lockfile policy: commit `package-lock.json` when aiming for reproducible CI; if not committed, do not enable cache in CI.
 - Do not introduce `pnpm` or `yarn` unless discussed.
 
 ## Monorepo Linking
-- When workspace protocol fails in CI, temporarily replace `workspace:*` with `file:../../<path>` in dependents to unblock builds.
-- Keep internal package `@carenest/db` building types (`.d.ts`).
+- If CI cannot resolve `workspace:*`, temporarily use `file:../../<path>` to unblock.
+- Internal package `@carenest/db` must build `.d.ts` declarations.
 
 ## TypeScript
-- Emit declarations for shared packages (`declaration: true`).
-- Do not suppress type errors with `any` unless absolutely necessary and documented.
+- Shared packages must enable `declaration: true`.
+- Avoid `any`; never suppress type errors without justification.
 
 ## Formatting & EOL
-- Respect `.editorconfig` and `.gitattributes`.
-- Use LF endings; avoid CRLF churn.
+- Respect `.editorconfig` and `.gitattributes` (LF endings, consistent indentation).
 
 ## CI
-- Use GitHub Actions with Node 20 and npm 10.
-- If lockfile is committed, use `npm ci`; otherwise use `npm install` without cache.
+- GitHub Actions uses Node 20 and npm 10.
+- With lockfile: use `npm ci`. Without lockfile: use `npm install` (no cache).
 
 ## Security
-- Do not commit secrets. Use `.env.local` locally; keep samples updated.
+- No secrets in repo. Use `.env.local`; keep `env.sample` files updated.
 
 ## README/Docs
 - Update `README.md` and `apps/*/env.sample` when adding env vars or endpoints.
+
 
