@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
 import { sendAlert } from '../services/alerts';
 import { prisma } from '@carenest/db';
 import jwt from 'jsonwebtoken';
@@ -6,6 +8,7 @@ import { config } from '../config';
 import { Router as ExpressRouter } from 'express';
 
 export const alertsRouter = Router();
+const ingestLimiter = rateLimit({ windowMs: 60_000, max: 120 });
 
 alertsRouter.post('/', async (req, res) => {
   const { subject, message, to, channel } = req.body as {
@@ -43,9 +46,14 @@ alertsRouter.get('/', async (req, res) => {
 });
 
 // Camera events ingest (protected via ingest token)
-alertsRouter.post('/events', async (req, res) => {
+alertsRouter.post('/events', ingestLimiter, async (req, res) => {
   const token = req.headers['x-ingest-token'];
-  if (!token || token !== process.env.INGEST_TOKEN) {
+  const expected = process.env.INGEST_TOKEN || '';
+  // constant-time compare
+  const provided = typeof token === 'string' ? token : Array.isArray(token) ? token[0] : '';
+  const ok = provided.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+  if (!ok) {
     return res.status(401).json({ error: 'unauthorized' });
   }
   const { cameraId, type, details } = req.body as { cameraId?: string; type?: string; details?: unknown };

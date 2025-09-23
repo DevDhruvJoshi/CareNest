@@ -6,6 +6,7 @@ import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import client from 'prom-client';
 
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
@@ -42,6 +43,18 @@ app.use(morgan('dev', {
     return h.includes('authorization');
   }
 }));
+
+// Prometheus metrics
+client.collectDefaultMetrics();
+app.get('/metrics', async (_req, res) => {
+  try {
+    res.set('Content-Type', client.register.contentType);
+    const metrics = await client.register.metrics();
+    res.send(metrics);
+  } catch (e) {
+    res.status(500).send('metrics error');
+  }
+});
 
 app.use('/health', healthRouter);
 app.use('/auth', authRouter);

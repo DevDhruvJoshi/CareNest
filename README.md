@@ -19,11 +19,11 @@ Monorepo for CareNest backend (API), frontend (web), and shared packages.
 
 - Install: `npm install --workspaces --include-workspace-root`
 - Dev: `npm run dev` (API on 4000, Web on 3000)
-- Docker: `docker compose up -d`
+- Docker: `docker compose up -d` (includes Postgres, API, Web, Enterprise)
 
 ## Environment
 
-- API (`apps/api`): `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`
+- API (`apps/api`): `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`, `INGEST_TOKEN`, `READ_TOKEN`
 - Web (`apps/web`): `NEXT_PUBLIC_API_URL`
  - API LLM (optional): `OPENAI_API_KEY`, `OPENAI_MODEL` (default: `gpt-4o-mini`)
 - Alerts escalation (optional): `ALERT_ESCALATION_RECIPIENTS`
@@ -40,8 +40,9 @@ Monorepo for CareNest backend (API), frontend (web), and shared packages.
   - API: process env → values from `apps/api/.env` (via `dotenv`) → runtime defaults validated by Zod in `apps/api/src/config.ts`.
   - Web: process env at build time. Only `NEXT_PUBLIC_*` keys are exposed to the browser.
 - Central variables currently used:
-  - API: `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`
+  - API: `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`, `INGEST_TOKEN`, `READ_TOKEN`
   - Web: `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000`)
+  - Tokens: `INGEST_TOKEN` for Enterprise→API ingest, `READ_TOKEN` for read-only events
   - Alerts (optional): `ALERT_SMS_PROVIDER`, `ALERT_SMS_TWILIO_ACCOUNT_SID`, `ALERT_SMS_TWILIO_AUTH_TOKEN`, `ALERT_SMS_FROM`, `ALERT_EMAIL_SMTP_HOST`, `ALERT_EMAIL_SMTP_PORT`, `ALERT_EMAIL_SMTP_USER`, `ALERT_EMAIL_SMTP_PASS`
 
 ### Examples
@@ -79,6 +80,9 @@ Web `.env.local` (apps/web/.env.local):
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_READ_TOKEN=dev-read-token
+# Optional: if you want to read camera events without JWT
+NEXT_PUBLIC_READ_TOKEN=dev-read-token
 
 ### AI Planning Endpoint (optional)
 
