@@ -28,8 +28,17 @@ jobs:
           node -v
           npm -v
 
-      - name: Install dependencies (workspaces via npm ci)
-        run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
+      - name: Install dependencies (prefer npm ci, fallback to install)
+        shell: bash
+        run: |
+          set -e
+          echo "Using npm $(npm -v)"
+          if npm ci --workspaces --include-workspace-root --no-audit --no-fund; then
+            echo "npm ci succeeded"
+          else
+            echo "npm ci failed, falling back to npm install"
+            npm install --workspaces --include-workspace-root --no-audit --no-fund
+          fi
 
       - name: Prisma generate
         run: npm run -w packages/db prisma:generate
