@@ -9,8 +9,10 @@ import morgan from 'morgan';
 
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
+import { alertsRouter } from './routes/alerts';
 import { config } from './config';
 import { usersRouter } from './routes/users';
+import { aiRouter } from './routes/ai';
 
 const app = express();
 const server = http.createServer(app);
@@ -25,6 +27,8 @@ app.use(morgan('dev'));
 app.use('/health', healthRouter);
 app.use('/auth', authRouter);
 app.use('/users', usersRouter);
+app.use('/alerts', alertsRouter);
+app.use('/ai', aiRouter);
 
 app.get('/', (_req, res) => {
   res.json({ name: 'CareNest API', status: 'ok' });
