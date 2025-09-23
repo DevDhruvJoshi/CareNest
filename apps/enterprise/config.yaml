@@ -1,0 +1,11 @@
+system:
+  env: local
+alert:
+  emergency_contacts: []
+camera:
+  resolution: [1280, 720]
+  fps: 15
+privacy:
+  local_processing: true
+  no_internet: true
+

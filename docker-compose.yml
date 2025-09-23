@@ -37,6 +37,18 @@ services:
     depends_on:
       - api
 
+  enterprise:
+    build:
+      context: .
+      dockerfile: ./apps/enterprise/Dockerfile
+    environment:
+      APP_ENV: local
+      PORT: 5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      - api
+
 volumes:
   db_data:
 
