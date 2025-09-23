@@ -18,6 +18,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: Use npm@10
+        run: npm i -g npm@10
+
       - name: Show versions
         run: |
           node -v
