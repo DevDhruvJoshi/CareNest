@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev ]
 
 jobs:
   build:
@@ -14,7 +14,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
+          cache: 'npm'
+      - run: npm install --no-audit --no-fund
+        env:
+          CI: true
+          NEXT_TELEMETRY_DISABLED: 1
+      - run: npm run -w packages/db prisma:generate
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/carenest
       - run: npm run -w apps/api build
       - run: npm run -w apps/web build
 
