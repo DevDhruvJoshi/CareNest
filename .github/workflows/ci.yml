@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ dev ]
+    branches: [ main, dev ]
 
 jobs:
   build:
@@ -16,45 +16,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Print npm version
-        run: npm --version
-
-      - name: Install deps (workspaces)
-        run: npm install --workspaces --include-workspace-root
-
-      - name: Build all workspaces
-        run: npm run build --workspaces --if-present
-
-      - name: API build
-        run: npm run -w apps/api build
-
-      - name: Web build
-        run: npm run -w apps/web build
-name: build
-
-on:
-  push:
-    branches:
-      - dev
-      - feat/**
-  pull_request:
-    branches:
-      - dev
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
+          node-version: 20
           cache: 'npm'
 
       - name: Show versions
@@ -63,7 +25,7 @@ jobs:
           npm -v
 
       - name: Install dependencies (workspaces)
-        run: npm install --no-audit --no-fund
+        run: npm install --workspaces --include-workspace-root --no-audit --no-fund
 
       - name: Prisma generate
         run: npm run -w packages/db prisma:generate
@@ -76,31 +38,5 @@ jobs:
 
       - name: Build Web
         run: npm run -w apps/web build
-
-name: CI
-
-on:
-  push:
-    branches: [ main, dev ]
-  pull_request:
-    branches: [ main, dev ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install --no-audit --no-fund
-        env:
-          CI: true
-          NEXT_TELEMETRY_DISABLED: 1
-      - run: npm run -w packages/db prisma:generate
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/carenest
-      - run: npm run -w apps/api build
-      - run: npm run -w apps/web build
 
 
