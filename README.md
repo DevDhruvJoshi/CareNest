@@ -26,6 +26,53 @@ Monorepo for CareNest backend (API), frontend (web), and shared packages.
 - Web (`apps/web`): `NEXT_PUBLIC_API_URL`
 - Samples: `apps/api/env.sample`, `apps/web/env.sample`
 
+### Env & Config Strategy
+
+- Scope: Each workspace manages its own `.env` files in its directory. The API loads variables via `dotenv` from `apps/api/.env*`; the Web app follows Next.js conventions in `apps/web/.env*`.
+- Recommended files per workspace:
+  - `.env.local` for local-only, uncommitted values
+  - `.env.development`, `.env.staging`, `.env.production` as needed
+  - Keep `env.sample` up to date (document keys without secrets)
+- Load order (effective):
+  - API: process env → values from `apps/api/.env` (via `dotenv`) → runtime defaults validated by Zod in `apps/api/src/config.ts`.
+  - Web: process env at build time. Only `NEXT_PUBLIC_*` keys are exposed to the browser.
+- Central variables currently used:
+  - API: `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`
+  - Web: `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000`)
+  - Optional alert placeholders (API): `ALERT_SMS_PROVIDER_*`, `ALERT_EMAIL_SMTP_*` (see `apps/api/env.sample`)
+
+### Examples
+
+API `.env.local` (apps/api/.env.local):
+
+```
+PORT=4000
+NODE_ENV=development
+JWT_SECRET=dev-secret
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/carenest
+# Optional alert placeholders
+# ALERT_SMS_PROVIDER=twilio
+# ALERT_SMS_TWILIO_ACCOUNT_SID=...
+# ALERT_SMS_TWILIO_AUTH_TOKEN=...
+# ALERT_SMS_FROM=+10000000000
+# ALERT_EMAIL_SMTP_HOST=smtp.example.com
+# ALERT_EMAIL_SMTP_PORT=587
+# ALERT_EMAIL_SMTP_USER=username
+# ALERT_EMAIL_SMTP_PASS=password
+```
+
+Web `.env.local` (apps/web/.env.local):
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
+
+### Notes
+
+- CI uses Node 20 with npm workspaces; it runs a single install at repo root, then builds `packages/db`, `apps/api`, and `apps/web`.
+- Prisma reads `DATABASE_URL` at build/runtime. In Docker Compose, the API uses the `db` service URL.
+- Only `NEXT_PUBLIC_*` keys appear in the browser. Keep secrets server-side.
+
 ## CI/CD
 
 - GitHub Actions: `.github/workflows/ci.yml` builds API & Web
