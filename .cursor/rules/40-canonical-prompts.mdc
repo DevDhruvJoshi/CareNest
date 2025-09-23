@@ -1,0 +1,24 @@
+---
+name: Canonical Prompts & Usage
+labels: [sources, prompts, authority]
+version: 1
+priority: high
+---
+
+## Canonical Sources
+- `Prompts/IDE_AI_IMPLEMENTATION_PROMPT.md`
+- `Prompts/Prompt.md`
+
+## Usage Policy
+- Treat these files as the authoritative specification for scope, features, and deployment.
+- When planning or implementing features, align acceptance criteria with the checklists and phases defined in these prompts.
+- Prefer local-first, privacy-by-design decisions consistent with these documents.
+
+## Implementation Notes
+- Reflect hardware and deployment constraints (Raspberry Pi 4B, UPS, RTSP cameras).
+- Enforce non-negotiables (zero-config startup, production readiness, Gujarati-first UX).
+- Map tasks to CI/CD, monitoring, and recovery gates specified in `IDE_AI_IMPLEMENTATION_PROMPT.md`.
+
+## Change Management
+- If prompts are updated, re-read and reconcile rules/memories accordingly.
+- Record significant technical decisions and conventions in `90-learned-memories.mdc`.

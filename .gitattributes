@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.ts diff=ts
+*.tsx diff=ts
+*.md linguist-detectable=true
+
+

@@ -1,0 +1,39 @@
+---
+name: CareNest Enterprise - Project Overview
+labels: [overview, objectives, context]
+version: 1
+priority: high
+---
+
+## Project One-Liner
+CareNest Enterprise: 24/7 AI-powered health monitoring ecosystem for an elderly mother with special needs; production-grade, next-day deployable, privacy-first, local-first.
+
+## Non-Negotiables
+- Ready-to-use, zero-config startup
+- Production quality with CI/CD, monitoring, recovery
+- Local processing only (no cloud), privacy-by-design
+- Gujarati-first UX for the primary user; Hindi/English optional
+- Enterprise security (Zero-Trust, E2E encryption, audit logging)
+
+## Key Capabilities
+- RTSP multi-camera ingestion and real-time AI analysis (fall detection, pose, facial indicators)
+- Health monitoring: breathing, vitals estimation, posture, sleep, activity timeline
+- Multi-channel alerts: SMS, Email, Phone, Push; Gujarati messages
+- Web dashboard (mobile-first) with live feeds and real-time status via WebSockets
+- Auto-recovery: services, cameras, storage, network; backup/restore
+
+## Target Environments
+- Development: Windows 10/11 (PowerShell), Linux, macOS
+- Production: Raspberry Pi 4B (8GB), Debian/RPi OS; UPS-backed
+
+## High-Level Structure (expected repository skeleton)
+- `main.py`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`
+- `src/` with `core/`, `ai/`, `alerts/`, `web/`, `database/`, `security/`, `monitoring/`, `utils/`, `storage/`
+- `templates/`, `static/`, `models/`, `logs/`, `config/`
+
+## Acceptance Gates (must be true)
+- Dashboard reachable on localhost:5000 (not WAN-exposed)
+- Services managed via systemd/docker; auto-start on boot
+- UFW enabled, SSH hardened, Fail2Ban active
+- Alerts deliver end-to-end with configured contacts
+- Auto-recovery verified (simulated failures)

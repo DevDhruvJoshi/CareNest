@@ -1,0 +1,41 @@
+---
+name: Code Style & Editing Standards
+labels: [code-style, editing, lints]
+version: 1
+priority: high
+---
+
+## Naming
+- Use meaningful, descriptive names; avoid abbreviations and 1–2 letter identifiers.
+- Functions: verbs or verb phrases. Variables: nouns or noun phrases.
+
+## Types (when applicable)
+- Explicitly annotate public APIs in statically typed languages.
+- Avoid unsafe casts and `any`-like types.
+
+## Control Flow
+- Use guard clauses; handle edge cases early.
+- Avoid deep nesting; prefer early returns.
+- Do not swallow errors; handle them meaningfully.
+
+## Comments
+- Only for non-obvious logic; explain "why" not "how".
+- No inline commentary; place comments above code.
+
+## Formatting
+- Match existing style; preserve indentation style (tabs vs spaces) and width.
+- Prefer multi-line clarity over dense one-liners.
+- Do not reformat unrelated code.
+
+## Editing Rules (Cursor)
+- Never dump large code in chat; use edits to modify files.
+- Ensure all dependencies/imports are present for runnable code.
+- Validate with linters; fix introduced issues promptly.
+
+## Secrets & Config
+- Do not commit secrets. Use env vars, CI secrets, or K8s secrets.
+- Maintain `.env.example`; ignore real `.env*` files in VCS.
+
+## Testing & CI
+- Add/maintain tests when changing behavior.
+- Keep builds green; prioritize reliability.

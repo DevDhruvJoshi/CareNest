@@ -1,0 +1,25 @@
+---
+name: Learned Memories (Project)
+labels: [memories, preferences, environment]
+version: 1
+priority: medium
+---
+
+## User Preferences
+- Default response language: Hindi
+- Prefer concise answers with skimmable structure
+
+## Environment
+- OS: Windows 10 (win32), Shell: PowerShell
+- Workspace Path: D:\Development\AI\CareNest
+- Typical local dashboard port: 5000 (not WAN-exposed)
+
+## Technical Decisions
+- Privacy-first, local processing; no cloud dependency
+- Use `config.yaml` as configuration source of truth with env overlays
+- Enforce SSH key auth; UFW + Fail2Ban in production
+
+## Project Conventions
+- Use `.cursor/rules/*.mdc` for rules and memories
+- Cite existing code via Cursor Code References format
+- Do not commit real secrets; maintain `.env.example` only

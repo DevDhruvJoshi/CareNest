@@ -1,0 +1,33 @@
+---
+name: Communication & Formatting Rules (Cursor)
+labels: [communication, formatting, citations]
+version: 1
+priority: high
+---
+
+## Language & Tone
+- Always respond in Hindi unless the user explicitly requests another language.
+- Keep responses concise by default; provide scannable structure with headings and bullets.
+
+## Markdown Usage
+- Use markdown headings (##, ###) and bullets. Avoid top-level #.
+- Format file, directory, class, and function names with backticks.
+- For URLs, use markdown links or wrap in backticks.
+- Keep code blocks minimal and only when necessary.
+
+## Code Citation Policy (Cursor)
+- When referencing existing files, use Code Reference blocks with the exact syntax:
+```
+startLine:endLine:filepath
+// code here
+```
+- When proposing new code not yet in the repo, use standard markdown code blocks with a language tag, no line numbers.
+- Never mix the two formats and never indent the code fences.
+
+## Status Updates
+- Provide brief progress notes when using tools or making edits.
+- If stating you are about to perform an action, execute it in the same turn.
+
+## Safety Defaults
+- Prefer least-privilege network exposure; do not expose port 5000 to WAN.
+- Emphasize privacy-first, local processing, and discreet operation.
