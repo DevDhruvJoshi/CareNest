@@ -23,7 +23,7 @@ jobs:
         run: npm --version
 
       - name: Install deps (workspaces)
-        run: npm ci
+        run: npm install --workspaces --include-workspace-root
 
       - name: Build all workspaces
         run: npm run build --workspaces --if-present
