@@ -10,14 +10,14 @@ Monorepo for CareNest backend (API), frontend (web), and shared packages.
 
 ## Requirements
 
-- Node.js 18+
-- npm 9+
+- Node.js 20+
+- npm 10+
 - Docker (optional for local DB)
  - Optional: OpenAI account and API key if you use the AI planning endpoint
 
 ## Getting Started
 
-- Install: `npm install`
+- Install: `npm install --workspaces --include-workspace-root`
 - Dev: `npm run dev` (API on 4000, Web on 3000)
 - Docker: `docker compose up -d`
 
@@ -26,6 +26,7 @@ Monorepo for CareNest backend (API), frontend (web), and shared packages.
 - API (`apps/api`): `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`
 - Web (`apps/web`): `NEXT_PUBLIC_API_URL`
  - API LLM (optional): `OPENAI_API_KEY`, `OPENAI_MODEL` (default: `gpt-4o-mini`)
+- Alerts escalation (optional): `ALERT_ESCALATION_RECIPIENTS`
 - Samples: `apps/api/env.sample`, `apps/web/env.sample`
 
 ### Env & Config Strategy
@@ -41,7 +42,7 @@ Monorepo for CareNest backend (API), frontend (web), and shared packages.
 - Central variables currently used:
   - API: `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`
   - Web: `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000`)
-  - Optional alert placeholders (API): `ALERT_SMS_PROVIDER_*`, `ALERT_EMAIL_SMTP_*` (see `apps/api/env.sample`)
+  - Alerts (optional): `ALERT_SMS_PROVIDER`, `ALERT_SMS_TWILIO_ACCOUNT_SID`, `ALERT_SMS_TWILIO_AUTH_TOKEN`, `ALERT_SMS_FROM`, `ALERT_EMAIL_SMTP_HOST`, `ALERT_EMAIL_SMTP_PORT`, `ALERT_EMAIL_SMTP_USER`, `ALERT_EMAIL_SMTP_PASS`
 
 ### Examples
 
@@ -52,7 +53,7 @@ PORT=4000
 NODE_ENV=development
 JWT_SECRET=dev-secret
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/carenest
-# Optional alert placeholders
+# Alerts (optional)
 # ALERT_SMS_PROVIDER=twilio
 # ALERT_SMS_TWILIO_ACCOUNT_SID=...
 # ALERT_SMS_TWILIO_AUTH_TOKEN=...
@@ -66,6 +67,13 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/carenest
 # OPENAI_API_KEY=sk-...
 # OPENAI_MODEL=gpt-4o-mini
 ```
+
+## Database (Prisma)
+
+- Generate Client: `npm run db:generate`
+- Migrate (dev): `npm run db:migrate`
+- Seed: `npm run db:seed`
+- Full setup: `npm run db:setup`
 
 Web `.env.local` (apps/web/.env.local):
 

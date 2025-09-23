@@ -16,3 +16,23 @@ model User {
 }
 
 
+model Alert {
+  id        String   @id @default(cuid())
+  level     String
+  subject   String?
+  message   String
+  channel   String
+  to        String?
+  status    String    @default("sent") // sent, failed, escalated
+  meta      Json?
+  createdAt DateTime  @default(now())
+}
+
+model CameraEvent {
+  id        String   @id @default(cuid())
+  cameraId  String
+  type      String   // motion, fall, offline, online
+  details   Json?
+  createdAt DateTime @default(now())
+}
+

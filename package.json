@@ -12,11 +12,15 @@
     "dev": "npm run -ws --if-present dev",
     "start": "npm run -w apps/api start",
     "lint": "npm run -ws --if-present lint",
-    "test": "npm run -ws --if-present test"
+    "test": "npm run -ws --if-present test",
+    "db:generate": "npm run -w packages/db prisma:generate",
+    "db:migrate": "npm run -w packages/db prisma:migrate",
+    "db:seed": "npm run -w packages/db seed",
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed"
   },
   "engines": {
-    "node": ">=18",
-    "npm": ">=9"
+    "node": ">=20",
+    "npm": ">=10"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.7.0",

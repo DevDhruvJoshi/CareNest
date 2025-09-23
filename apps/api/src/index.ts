@@ -18,16 +18,35 @@ const app = express();
 const server = http.createServer(app);
 const port = config.port;
 import { setupWebSocket } from './ws';
+import rateLimit from 'express-rate-limit';
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "img-src": ["'self'", 'data:'],
+      "object-src": ["'none'"],
+      "script-src": ["'self'"]
+    }
+  },
+  referrerPolicy: { policy: 'no-referrer' },
+  crossOriginEmbedderPolicy: false,
+}));
+const alertsLimiter = rateLimit({ windowMs: 60_000, max: 60 });
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
+app.use(morgan('dev', {
+  skip: (req) => {
+    const h = Object.keys(req.headers).join(',');
+    return h.includes('authorization');
+  }
+}));
 
 app.use('/health', healthRouter);
 app.use('/auth', authRouter);
 app.use('/users', usersRouter);
-app.use('/alerts', alertsRouter);
+app.use('/alerts', alertsLimiter, alertsRouter);
 app.use('/ai', aiRouter);
 
 app.get('/', (_req, res) => {
