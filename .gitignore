@@ -13,6 +13,33 @@ Dockerfile.local
 docker-compose.override.yml
 pnpm-lock.yaml
 yarn.lock
-package-lock.json
+
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Caches
+.cache/
+.eslintcache
+
+# Python artifacts
+**/.pytest_cache/
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+
+# Build outputs (keep tracked ones intact)
+**/out/
+
+# Next.js
+**/.next/
+
+# Env examples should be tracked
+!**/env.sample
 
 
