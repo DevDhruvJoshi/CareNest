@@ -9,9 +9,10 @@ RUN npm ci
 RUN npm run -w packages/db build && npm run -w packages/db prisma:generate
 
 # Ensure the built dist exists inside installed package (file: dep)
-RUN mkdir -p node_modules/@carenest/db && \
+# Replace potential workspace symlink with real package files for runtime
+RUN rm -rf node_modules/@carenest/db && \
+    mkdir -p node_modules/@carenest/db && \
     cp packages/db/package.json node_modules/@carenest/db/package.json && \
-    rm -rf node_modules/@carenest/db/dist && \
     cp -r packages/db/dist node_modules/@carenest/db/dist
 
 # Build API

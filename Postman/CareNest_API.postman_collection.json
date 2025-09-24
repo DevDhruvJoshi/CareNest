@@ -1,0 +1,183 @@
+{
+  "info": {
+    "name": "CareNest API",
+    "_postman_id": "carenest-api-collection",
+    "description": "Comprehensive Postman collection for CareNest API (auth, users, alerts, ai, health, metrics).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:4000" },
+    { "key": "ingest_token", "value": "dev-ingest-token" },
+    { "key": "read_token", "value": "dev-read-token" },
+    { "key": "jwt", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "POST /health/broadcast",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"health_update\",\n  \"payload\": { \"status\": \"ok\" }\n}"
+            },
+            "url": { "raw": "{{base_url}}/health/broadcast", "host": ["{{base_url}}"], "path": ["health","broadcast"] }
+          }
+        },
+        {
+          "name": "GET /metrics",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/metrics", "host": ["{{base_url}}"], "path": ["metrics"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"roles\": [\"admin\"]\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth","login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.token) { pm.collectionVariables.set('jwt', json.token); pm.environment.set('jwt', json.token); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{jwt}}", "type": "text" } ],
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth","me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GET /users",
+          "request": { "method": "GET", "url": { "raw": "{{base_url}}/users", "host": ["{{base_url}}"], "path": ["users"] } }
+        },
+        {
+          "name": "POST /users",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@example.com\",\n  \"name\": \"User\"\n}" },
+            "url": { "raw": "{{base_url}}/users", "host": ["{{base_url}}"], "path": ["users"] }
+          }
+        },
+        {
+          "name": "GET /users/:id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/users/{{user_id}}", "host": ["{{base_url}}"], "path": ["users","{{user_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Alerts",
+      "item": [
+        {
+          "name": "POST /alerts (send alert)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Test\",\n  \"message\": \"Hello\",\n  \"to\": \"+19998887777\",\n  \"channel\": \"log\"\n}" },
+            "url": { "raw": "{{base_url}}/alerts", "host": ["{{base_url}}"], "path": ["alerts"] }
+          }
+        },
+        {
+          "name": "GET /alerts (list)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{jwt}}", "type": "text" } ],
+            "url": {
+              "raw": "{{base_url}}/alerts?take=20",
+              "host": ["{{base_url}}"],
+              "path": ["alerts"],
+              "query": [ { "key": "take", "value": "20" } ]
+            }
+          }
+        },
+        {
+          "name": "POST /alerts/events (ingest)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-ingest-token", "value": "{{ingest_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cameraId\": \"cam-1\",\n  \"type\": \"motion\",\n  \"details\": { \"confidence\": 0.9 }\n}"
+            },
+            "url": { "raw": "{{base_url}}/alerts/events", "host": ["{{base_url}}"], "path": ["alerts","events"] }
+          }
+        },
+        {
+          "name": "GET /alerts/events (list)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "x-read-token", "value": "{{read_token}}" } ],
+            "url": {
+              "raw": "{{base_url}}/alerts/events?take=50",
+              "host": ["{{base_url}}"],
+              "path": ["alerts","events"],
+              "query": [ { "key": "take", "value": "50" } ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI",
+      "item": [
+        {
+          "name": "POST /ai/plan",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rpiHostname\": \"raspberrypi.local\",\n  \"vpsHost\": \"your.vps.example.com\",\n  \"vpsUser\": \"ubuntu\",\n  \"remotePort\": 5000,\n  \"localPort\": 5000,\n  \"sshPort\": 22\n}"
+            },
+            "url": { "raw": "{{base_url}}/ai/plan", "host": ["{{base_url}}"], "path": ["ai","plan"] }
+          }
+        }
+      ]
+    }
+  ]
+}
+
+

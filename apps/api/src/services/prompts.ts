@@ -17,14 +17,23 @@ export function loadIdeMasterPrompt(): { full: string; masterBlock: string } {
   if (!content) {
     return { full: '', masterBlock: '' };
   }
-  // Extract code block under ONE‑SHOT SETUP MASTER PROMPT
-  const startMarker = '## 🧠 ONE‑SHOT SETUP MASTER PROMPT';
-  const idx = content.indexOf(startMarker);
-  if (idx === -1) {
+  // Extract the first fenced code block after the heading that starts with
+  // "## 🧠 ONE‑SHOT SETUP MASTER PROMPT" (allowing any trailing text)
+  const lines = content.split(/\r?\n/);
+  const headingRegex = /^##\s*🧠\s*ONE‑SHOT SETUP MASTER PROMPT.*$/; // allow extra text after heading
+  let startLineIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (headingRegex.test(lines[i])) {
+      startLineIndex = i;
+      break;
+    }
+  }
+  if (startLineIndex === -1) {
     return { full: content, masterBlock: '' };
   }
-  const slice = content.slice(idx);
-  const codeBlockMatch = slice.match(/```\w*\n([\s\S]*?)\n```/);
+  // Search for the next fenced code block after the heading
+  const after = lines.slice(startLineIndex + 1).join('\n');
+  const codeBlockMatch = after.match(/```[\w-]*\n([\s\S]*?)\n```/);
   const masterBlock = codeBlockMatch ? codeBlockMatch[1].trim() : '';
   return { full: content, masterBlock };
 }
