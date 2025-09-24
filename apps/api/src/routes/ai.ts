@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { loadIdeMasterPrompt } from '../services/prompts';
 import { generatePlanFromPrompt } from '../services/llm';
+import { requireAuth } from './auth';
 
 export const aiRouter = Router();
 
@@ -14,7 +15,7 @@ const planSchema = z.object({
   sshPort: z.number().int().positive().optional(),
 });
 
-aiRouter.post('/plan', async (req, res) => {
+aiRouter.post('/plan', requireAuth(['admin']), async (req, res) => {
   const parsed = planSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });

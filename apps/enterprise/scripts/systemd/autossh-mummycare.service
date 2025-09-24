@@ -1,0 +1,19 @@
+[Unit]
+Description=AutoSSH reverse tunnel for CareNest (mummycare)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=CMD=/usr/bin/autossh -M 0 -N -R 5000:localhost:5000 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -i %h/.ssh/mummycare_id_rsa -p 22 ubuntu@your.vps.example.com
+ExecStart=/bin/sh -lc "$CMD"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+

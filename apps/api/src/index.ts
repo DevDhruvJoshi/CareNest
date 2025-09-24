@@ -14,6 +14,9 @@ import { alertsRouter } from './routes/alerts';
 import { config } from './config';
 import { usersRouter } from './routes/users';
 import { aiRouter } from './routes/ai';
+import { messagesRouter } from './routes/messages';
+import { requireAuth } from './routes/auth';
+import { prisma } from '@carenest/db';
 
 const app = express();
 const server = http.createServer(app);
@@ -34,15 +37,35 @@ app.use(helmet({
   referrerPolicy: { policy: 'no-referrer' },
   crossOriginEmbedderPolicy: false,
 }));
-const alertsLimiter = rateLimit({ windowMs: 60_000, max: 60 });
-app.use(cors());
-app.use(express.json());
+const alertsLimiter = rateLimit({ windowMs: config.rateLimit.windowMs, max: config.rateLimit.max });
+app.set('trust proxy', config.trustProxy);
+app.use(cors({ origin: config.corsOrigin || true }));
+app.use(express.json({ limit: config.jsonLimit }));
 app.use(morgan('dev', {
   skip: (req) => {
     const h = Object.keys(req.headers).join(',');
     return h.includes('authorization');
   }
 }));
+
+// Audit logging middleware (best-effort; ignores errors if db not ready)
+app.use(async (req, _res, next) => {
+  try {
+    // only log mutating requests
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+      const actorId = (req as any).auth?.userId || 'anonymous';
+      await prisma.auditLog.create({
+        data: {
+          actorId,
+          action: `${req.method} ${req.path}`.slice(0, 128),
+          resource: 'api',
+          meta: { ip: req.ip } as any,
+        }
+      }).catch(() => {});
+    }
+  } catch {}
+  next();
+});
 
 // Prometheus metrics
 client.collectDefaultMetrics();
@@ -58,9 +81,10 @@ app.get('/metrics', async (_req, res) => {
 
 app.use('/health', healthRouter);
 app.use('/auth', authRouter);
-app.use('/users', usersRouter);
+app.use('/users', requireAuth(['admin']), usersRouter);
 app.use('/alerts', alertsLimiter, alertsRouter);
 app.use('/ai', aiRouter);
+app.use('/messages', messagesRouter);
 
 app.get('/', (_req, res) => {
   res.json({ name: 'CareNest API', status: 'ok' });

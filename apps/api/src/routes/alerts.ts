@@ -5,6 +5,7 @@ import { sendAlert } from '../services/alerts';
 import { prisma } from '@carenest/db';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { requireAuth } from './auth';
 import { Router as ExpressRouter } from 'express';
 
 export const alertsRouter = Router();
@@ -22,7 +23,7 @@ alertsRouter.post('/', async (req, res) => {
   res.json(result);
 });
 
-alertsRouter.get('/', async (req, res) => {
+alertsRouter.get('/', requireAuth(['admin']), async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'missing bearer token' });
   try {
