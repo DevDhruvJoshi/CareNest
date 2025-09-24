@@ -1,0 +1,217 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: carenest
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-secrets
+  namespace: carenest
+type: Opaque
+stringData:
+  JWT_SECRET: dev-secret
+  DATABASE_URL: postgres://postgres:postgres@postgres:5432/carenest
+  INGEST_TOKEN: dev-ingest-token
+  READ_TOKEN: dev-read-token
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: carenest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: carenest-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "4000"
+            - name: CORS_ORIGIN
+              value: "*"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: api-secrets
+                  key: JWT_SECRET
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: api-secrets
+                  key: DATABASE_URL
+            - name: INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: api-secrets
+                  key: INGEST_TOKEN
+            - name: READ_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: api-secrets
+                  key: READ_TOKEN
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: carenest
+spec:
+  type: ClusterIP
+  selector:
+    app: api
+  ports:
+    - port: 4000
+      targetPort: 4000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: carenest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: carenest-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: NEXT_PUBLIC_API_URL
+              value: http://api.carenest.svc.cluster.local:4000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: carenest
+spec:
+  type: ClusterIP
+  selector:
+    app: web
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: enterprise
+  namespace: carenest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: enterprise
+  template:
+    metadata:
+      labels:
+        app: enterprise
+    spec:
+      containers:
+        - name: enterprise
+          image: carenest-enterprise:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_ENV
+              value: production
+            - name: PORT
+              value: "5000"
+            - name: API_URL
+              value: http://api.carenest.svc.cluster.local:4000
+            - name: INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: api-secrets
+                  key: INGEST_TOKEN
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: enterprise
+  namespace: carenest
+spec:
+  type: ClusterIP
+  selector:
+    app: enterprise
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: carenest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              value: postgres
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: carenest
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: pgdata
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: carenest
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+
+
+
+

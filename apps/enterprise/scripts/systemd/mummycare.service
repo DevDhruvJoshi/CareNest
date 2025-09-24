@@ -1,0 +1,21 @@
+[Unit]
+Description=CareNest Enterprise (mummycare) Dashboard
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/CareNest/apps/enterprise
+Environment=APP_ENV=production
+Environment=PORT=5000
+ExecStart=%h/CareNest/apps/enterprise/.venv/bin/python %h/CareNest/apps/enterprise/main.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+

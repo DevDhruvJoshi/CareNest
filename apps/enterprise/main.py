@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, PlainTextRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
+import io
 import yaml
 import os
 import threading
@@ -24,6 +25,16 @@ try:
 except Exception:
     cv2 = None  # type: ignore
     np = None  # type: ignore
+
+try:
+    import onnxruntime as ort  # type: ignore
+except Exception:
+    ort = None  # type: ignore
+
+try:
+    from ultralytics import YOLO  # type: ignore
+except Exception:
+    YOLO = None  # type: ignore
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -125,6 +136,42 @@ class Alert(BaseModel):
     message: str
 
 
+#########################
+# Gujarati TTS & Voice   #
+#########################
+try:
+    from gtts import gTTS  # type: ignore
+except Exception:
+    gTTS = None  # type: ignore
+
+
+class TtsReq(BaseModel):
+    text: str
+    lang: str = "gu"
+
+
+@app.post('/api/tts')
+def tts(req: TtsReq):
+    if gTTS is None:
+        return JSONResponse({"error": "TTS not available"}, status_code=503)
+    try:
+        buf = io.BytesIO()
+        gTTS(text=req.text, lang=req.lang).write_to_fp(buf)
+        return Response(content=buf.getvalue(), media_type='audio/mpeg')
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+class VoiceCmdReq(BaseModel):
+    enabled: bool = False
+
+
+@app.post('/api/voice-cmd')
+def voice_cmd_toggle(req: VoiceCmdReq):
+    # stub: actual ASR integration not implemented yet
+    return {"enabled": bool(req.enabled)}
+
+
 class AutoSshConfig(BaseModel):
     mode: str
     remote_host: str
@@ -203,8 +250,9 @@ class TestEventReq(BaseModel):
 
 @app.post('/api/test-event')
 def emit_test_event(req: TestEventReq):
-    api = os.getenv('API_URL', 'http://localhost:4000')
-    ingest = os.getenv('INGEST_TOKEN', '')
+    cfg = load_config()
+    api = str(cfg.get('api', {}).get('base_url') or os.getenv('API_URL', 'http://localhost:4000'))
+    ingest = str(cfg.get('api', {}).get('ingest_token') or os.getenv('INGEST_TOKEN', ''))
     try:
         r = requests.post(
             f"{api}/alerts/events",
@@ -242,11 +290,38 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
     interval = 1.0 / max(fps, 1)
     backoff = 1.0
     pose = None
+    onnx_session = None
+    onnx_input_name = None
+    onnx_last_fire = 0.0
+    onnx_debounce = 3.0
+    yolo_model = None
+    yolo_last_infer = 0.0
+    yolo_interval = 0.5  # seconds between YOLO inferences
+    yolo_person_conf = 0.0
     if mp is not None:
         try:
             pose = mp.solutions.pose.Pose(static_image_mode=False, model_complexity=0, enable_segmentation=False)
         except Exception:
             pose = None
+    # Optional ONNX fall model
+    model_path = os.getenv('FALL_ONNX_MODEL')
+    if model_path and ort is not None and Path(model_path).exists():
+        try:
+            providers = ['CPUExecutionProvider']
+            onnx_session = ort.InferenceSession(model_path, providers=providers)
+            onnx_input_name = onnx_session.get_inputs()[0].name
+        except Exception:
+            onnx_session = None
+
+    # Optional YOLO person detector (requires ultralytics + weights available)
+    yolo_weights = os.getenv('YOLO_MODEL', 'yolov8n.pt')
+    yolo_enabled = (os.getenv('YOLO_ENABLED', 'false').lower() in ('1', 'true', 'yes'))
+    yolo_min_conf = float(os.getenv('YOLO_MIN_CONF', '0.25'))
+    if yolo_enabled and YOLO is not None:
+        try:
+            yolo_model = YOLO(yolo_weights)
+        except Exception:
+            yolo_model = None
     frame_count = 0
     motion_threshold = 12000  # pixels
     fall_nose_hip_delta = 0.03  # normalized y distance threshold
@@ -275,11 +350,11 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
             backoff = min(backoff * 2, 30.0)
             continue
         # Face blurring if enabled
-        try:
-            cfg = load_config()
-            blur_enabled = bool(cfg.get('privacy', {}).get('face_blur', False))
-        except Exception:
-            blur_enabled = False
+                try:
+                    cfg = load_config()
+                    blur_enabled = bool(cfg.get('privacy', {}).get('face_blur', False))
+                except Exception:
+                    blur_enabled = False
         if blur_enabled and cv2 is not None:
             try:
                 gray_face = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -313,8 +388,87 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
             prev_gray = gray
             if st:
                 st.motion = motion
-                # naive fall heuristic placeholder: if strong vertical edges + motion
-                st.fall = bool(motion)
+                # naive baseline: motion suggests activity; fall decided via pose/onnx below
+                st.fall = False
+
+                # ONNX fall model inference (very minimal stub): resize grayscale to 224x224 and run
+                if onnx_session is not None and np is not None and (now - onnx_last_fire) > onnx_debounce:
+                    try:
+                        resized = cv2.resize(gray, (224, 224))
+                        # normalize to 0..1 and add batch/channel dims: [1,1,224,224]
+                        inp = (resized.astype('float32') / 255.0)[None, None, :, :]
+                        out = onnx_session.run(None, {onnx_input_name: inp})
+                        score = float(out[0].ravel()[0]) if out and len(out[0].shape) >= 1 else 0.0
+                        # threshold; if score>0.5 treat as fall
+                        if score > 0.5:
+                            st.fall = True
+                            onnx_last_fire = now
+                    except Exception:
+                        pass
+
+                # MediaPipe pose enhancement: consider nose-to-hip delta + shoulder angle for fall
+                # and combine with motion
+                pose_fall = False
+                if pose is not None and frame_count % 5 == 0:
+                    try:
+                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        res = pose.process(rgb)
+                        if res and res.pose_landmarks:
+                            lm = res.pose_landmarks.landmark
+                            nose = lm[0]
+                            left_hip = lm[23]
+                            right_hip = lm[24]
+                            left_shoulder = lm[11]
+                            right_shoulder = lm[12]
+                            cy = (left_hip.y + right_hip.y) / 2.0
+                            shoulder_angle = abs(left_shoulder.y - right_shoulder.y)
+                            nose_delta = cy - nose.y
+                            # If nose below hip (negative delta) or shoulders nearly horizontal but body low → possible fall
+                            pose_fall = motion and ((nose_delta < 0.02) or (shoulder_angle < 0.02 and nose_delta < 0.04))
+                            if pose_fall and (now - last_fall_ts) > 2.0:
+                                st.fall = True
+                                last_fall_ts = now
+                    except Exception:
+                        pass
+
+                # YOLO person detection (event emission with confidence)
+                person_event_emitted = False
+                if yolo_model is not None and (now - yolo_last_infer) > yolo_interval:
+                    try:
+                        yolo_last_infer = now
+                        img = frame
+                        results = yolo_model.predict(source=img, imgsz=320, verbose=False)
+                        conf = 0.0
+                        if results and len(results) > 0:
+                            r = results[0]
+                            # class 0 is 'person' for COCO
+                            for b in r.boxes:
+                                cls_id = int(getattr(b, 'cls', [0])[0]) if hasattr(b, 'cls') else 0
+                                score = float(getattr(b, 'conf', [0.0])[0]) if hasattr(b, 'conf') else 0.0
+                                if cls_id == 0 and score > conf:
+                                    conf = score
+                        yolo_person_conf = conf
+                        if conf >= yolo_min_conf:
+                            # emit person event with confidence
+                            try:
+                                cfg = load_config()
+                                api = str(cfg.get('api', {}).get('base_url') or os.getenv('API_URL', 'http://localhost:4000'))
+                                ingest = str(cfg.get('api', {}).get('ingest_token') or os.getenv('INGEST_TOKEN', ''))
+                                requests.post(
+                                    f"{api}/alerts/events",
+                                    json={
+                                        "cameraId": cam_id,
+                                        "type": "person",
+                                        "details": {"confidence": float(conf)},
+                                    },
+                                    headers={"x-ingest-token": ingest},
+                                    timeout=1.5,
+                                )
+                                person_event_emitted = True
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
 
                 # mediapipe pose heuristic (if available) every 5th frame
                 frame_count += 1
@@ -346,8 +500,9 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                         pass
                 # post events to API
                 try:
-                    api = os.getenv('API_URL', 'http://localhost:4000')
-                    ingest = os.getenv('INGEST_TOKEN', '')
+                    cfg = load_config()
+                    api = str(cfg.get('api', {}).get('base_url') or os.getenv('API_URL', 'http://localhost:4000'))
+                    ingest = str(cfg.get('api', {}).get('ingest_token') or os.getenv('INGEST_TOKEN', ''))
                     if motion:
                         requests.post(
                             f"{api}/alerts/events",
@@ -368,6 +523,8 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                                 "details": {
                                     "noseHipDelta": float(nose_delta) if 'nose_delta' in locals() else None,
                                     "shoulderAngle": float(shoulder_angle) if 'shoulder_angle' in locals() else None,
+                                    "onnx": bool(onnx_session is not None),
+                                    "yoloPersonConfidence": float(yolo_person_conf),
                                 },
                             },
                             headers={"x-ingest-token": ingest},
@@ -510,7 +667,7 @@ def health_analytics():
 
 
 #########################
-# Watchdog & Backups    #
+# Watchdog, Power & Backups    #
 #########################
 
 def _watchdog_loop():
@@ -565,6 +722,32 @@ _watchdog_thread.start()
 _backup_thread = threading.Thread(target=_snapshot_backup_loop, daemon=True)
 _backup_thread.start()
 
+
+#########################
+# Battery/Power monitor #
+#########################
+try:
+    import psutil  # type: ignore
+except Exception:
+    psutil = None  # type: ignore
+
+
+@app.get('/api/power')
+def power_status():
+    data: Dict[str, Any] = {"ts": time.time(), "power": {}}
+    try:
+        if psutil and hasattr(psutil, 'sensors_battery'):
+            b = psutil.sensors_battery()
+            if b:
+                data["power"] = {
+                    "percent": getattr(b, 'percent', None),
+                    "secsleft": getattr(b, 'secsleft', None),
+                    "power_plugged": getattr(b, 'power_plugged', None),
+                }
+    except Exception:
+        pass
+    data.setdefault("power", {}).setdefault("source", "unknown")
+    return data
 
 @app.get('/api/camera')
 def list_cameras():

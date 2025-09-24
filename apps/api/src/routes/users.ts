@@ -1,9 +1,10 @@
 import { Router } from 'express';
+import { requireAuth } from './auth';
 import { prisma } from '@carenest/db';
 
 export const usersRouter = Router();
 
-usersRouter.get('/', async (_req, res) => {
+usersRouter.get('/', requireAuth(['admin']), async (_req, res) => {
   try {
     const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
     res.json(users);
@@ -12,7 +13,7 @@ usersRouter.get('/', async (_req, res) => {
   }
 });
 
-usersRouter.post('/', async (req, res) => {
+usersRouter.post('/', requireAuth(['admin']), async (req, res) => {
   const { email, name } = req.body as { email?: string; name?: string };
   if (!email) {
     return res.status(400).json({ error: 'email required' });
@@ -25,7 +26,7 @@ usersRouter.post('/', async (req, res) => {
   }
 });
 
-usersRouter.get('/:id', async (req, res) => {
+usersRouter.get('/:id', requireAuth(['admin']), async (req, res) => {
   const { id } = req.params;
   try {
     const user = await prisma.user.findUnique({ where: { id } });

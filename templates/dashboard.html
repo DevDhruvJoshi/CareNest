@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CareNest Dashboard</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; padding: 24px; background: #0b0f14; color: #f2f5f7; }
+    .container { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    .card { background: #121821; border: 1px solid #1e2633; border-radius: 8px; padding: 16px; margin-top: 16px; }
+    .muted { color: #aab4c0; }
+  </style>
+  </head>
+<body>
+  <div class="container">
+    <h1>CareNest Dashboard</h1>
+    <p class="muted">Minimal UI is running. Replace with full dashboard later.</p>
+    <div class="card">
+      <p>System status: <span id="status">Loading...</span></p>
+    </div>
+  </div>
+  <script>
+    fetch('/health').then(r=>r.json()).then(d=>{
+      document.getElementById('status').textContent = d.status + ' (' + (d.system?.port ?? 5000) + ')';
+    }).catch(()=>{
+      document.getElementById('status').textContent = 'error';
+    });
+  </script>
+</body>
+</html>
+
+
+

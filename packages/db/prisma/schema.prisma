@@ -45,3 +45,11 @@ model AuditLog {
   createdAt DateTime @default(now())
 }
 
+model Message {
+  id        String   @id @default(cuid())
+  fromId    String?
+  toId      String?
+  text      String
+  createdAt DateTime @default(now())
+}
+

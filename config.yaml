@@ -1,0 +1,38 @@
+system:
+  host: 0.0.0.0
+  port: 5000
+  debug: false
+
+camera: {}
+health_monitoring: {}
+communication: {}
+alert: {}
+privacy:
+  local_processing: true
+  no_internet: false
+  encrypted_storage: false
+  discreet_operation: true
+  silent_mode: true
+ssh_tunnel:
+  enabled: false
+  mode: reverse
+  remote_host: ""
+  remote_user: ""
+  remote_port: 5000
+  local_port: 5000
+  ssh_port: 22
+  keepalive: 60
+  retries: 3
+  gateway_ports: false
+  key_path: "~/.ssh/mummycare_id_rsa"
+security:
+  enforce_ssh_keys: true
+  ufw:
+    enabled: true
+    allow_inbound_ports: [22]
+  fail2ban:
+    enabled: true
+    maxretry: 5
+    bantime: 3600
+
+
