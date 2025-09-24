@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 import subprocess
 import shutil
+from urllib.parse import urlparse
 try:
     import mediapipe as mp  # type: ignore
 except Exception:
@@ -124,6 +125,53 @@ class Alert(BaseModel):
     message: str
 
 
+class AutoSshConfig(BaseModel):
+    mode: str
+    remote_host: str
+    remote_user: str
+    remote_port: int
+    local_port: int
+    ssh_port: int = 22
+    keepalive: int = 60
+    retries: int = 3
+    gateway_ports: bool = False
+    key_path: str = "~/.ssh/mummycare_id_rsa"
+
+
+def _build_autossh_command(cfg: dict) -> str:
+    t = cfg.get('ssh_tunnel', {})
+    if not t or not t.get('enabled'):
+        return ''
+    mode = t.get('mode', 'reverse')
+    remote_host = str(t.get('remote_host', 'your.vps.example.com'))
+    remote_user = str(t.get('remote_user', 'ubuntu'))
+    remote_port = int(t.get('remote_port', 5000))
+    local_port = int(t.get('local_port', 5000))
+    ssh_port = int(t.get('ssh_port', 22))
+    keepalive = int(t.get('keepalive', 60))
+    retries = int(t.get('retries', 3))
+    key_path = str(t.get('key_path', '~/.ssh/mummycare_id_rsa'))
+    if mode == 'reverse':
+        tunnel_flag = f"-R {remote_port}:localhost:{local_port}"
+    else:
+        tunnel_flag = f"-L {local_port}:localhost:{remote_port}"
+    cmd = (
+        f"autossh -M 0 -N {tunnel_flag} "
+        f"-o ServerAliveInterval={keepalive} -o ServerAliveCountMax={retries} "
+        f"-i {key_path} -p {ssh_port} {remote_user}@{remote_host}"
+    )
+    return cmd
+
+
+@app.get('/api/ssh-tunnel/cmd')
+def get_autossh_cmd():
+    cfg = load_config()
+    cmd = _build_autossh_command(cfg)
+    if not cmd:
+        return JSONResponse({"error": "ssh_tunnel disabled"}, status_code=400)
+    return {"autossh": cmd}
+
+
 @app.get("/api/health-status")
 def get_health_status():
     # placeholder values
@@ -145,6 +193,28 @@ def get_system_status():
 def post_alert(alert: Alert):
     # stub: log or enqueue alert
     return {"accepted": True, "level": alert.level}
+
+
+class TestEventReq(BaseModel):
+    cameraId: str = "testcam"
+    type: str = "motion"
+    details: Optional[Dict[str, Any]] = None
+
+
+@app.post('/api/test-event')
+def emit_test_event(req: TestEventReq):
+    api = os.getenv('API_URL', 'http://localhost:4000')
+    ingest = os.getenv('INGEST_TOKEN', '')
+    try:
+        r = requests.post(
+            f"{api}/alerts/events",
+            json={"cameraId": req.cameraId, "type": req.type, "details": req.details or {"source": "test"}},
+            headers={"x-ingest-token": ingest},
+            timeout=3,
+        )
+        return {"ok": r.ok, "status": r.status_code}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 ############################
 # RTSP ingest minimal stub #
@@ -178,8 +248,8 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
         except Exception:
             pose = None
     frame_count = 0
-    motion_threshold = 8000  # pixels
-    fall_nose_hip_delta = 0.02  # normalized y distance threshold
+    motion_threshold = 12000  # pixels
+    fall_nose_hip_delta = 0.03  # normalized y distance threshold
     fall_debounce_sec = 3.0
     last_fall_ts = 0.0
     while not _stop_flags.get(cam_id, False):
