@@ -4,9 +4,11 @@ pydantic==2.8.2
 python-dotenv==1.0.1
 PyYAML==6.0.2
 jinja2==3.1.4
-opencv-python==4.10.0.84
+# Headless OpenCV to avoid GUI deps on CI runners
+opencv-python-headless==4.10.0.84
 ffmpeg-python==0.2.0
-numpy==2.1.0
+# Pin to 1.26.x to satisfy ultralytics (<2.0) and broad wheel support
+numpy==1.26.4
 requests==2.32.3
 mediapipe==0.10.14
 ultralytics==8.2.103

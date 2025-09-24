@@ -350,11 +350,11 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
             backoff = min(backoff * 2, 30.0)
             continue
         # Face blurring if enabled
-                try:
-                    cfg = load_config()
-                    blur_enabled = bool(cfg.get('privacy', {}).get('face_blur', False))
-                except Exception:
-                    blur_enabled = False
+        try:
+            cfg = load_config()
+            blur_enabled = bool(cfg.get('privacy', {}).get('face_blur', False))
+        except Exception:
+            blur_enabled = False
         if blur_enabled and cv2 is not None:
             try:
                 gray_face = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
