@@ -61,6 +61,8 @@ jobs:
 
       - name: Run Enterprise tests
         working-directory: apps/enterprise
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         shell: bash
         run: |
           set -e
