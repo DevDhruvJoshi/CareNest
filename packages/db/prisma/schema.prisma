@@ -36,3 +36,12 @@ model CameraEvent {
   createdAt DateTime @default(now())
 }
 
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  resource  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+}
+

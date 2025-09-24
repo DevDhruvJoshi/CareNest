@@ -15,3 +15,27 @@ api:
   ingest_token: dev-ingest-token
 
 
+ssh_tunnel:
+  enabled: true
+  mode: reverse
+  remote_host: your.vps.example.com
+  remote_user: ubuntu
+  remote_port: 5000
+  local_port: 5000
+  ssh_port: 22
+  keepalive: 60
+  retries: 3
+  gateway_ports: false
+  key_path: ~/.ssh/mummycare_id_rsa
+
+security:
+  enforce_ssh_keys: true
+  ufw:
+    enabled: true
+    allow_inbound_ports: [22]
+  fail2ban:
+    enabled: true
+    maxretry: 5
+    bantime: 3600
+
+

@@ -1,17 +1,24 @@
-FROM node:20-alpine AS base
-WORKDIR /app
-
-# Install root deps
-COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
-COPY apps/api/package.json ./apps/api/
-RUN npm install --omit=dev --workspaces=false --prefix ./apps/api || true
-
-# Build
 FROM node:20-alpine AS build
 WORKDIR /app
+
+# Copy full monorepo and install deps
 COPY . .
 RUN npm ci
+
+# Build shared DB package and generate Prisma client first
+RUN npm run -w packages/db build && npm run -w packages/db prisma:generate
+
+# Ensure the built dist exists inside installed package (file: dep)
+RUN mkdir -p node_modules/@carenest/db && \
+    cp packages/db/package.json node_modules/@carenest/db/package.json && \
+    rm -rf node_modules/@carenest/db/dist && \
+    cp -r packages/db/dist node_modules/@carenest/db/dist
+
+# Build API
 RUN npm run -w apps/api build
+
+# Prune dev deps for production runtime and keep node_modules
+RUN npm ci --omit=dev
 
 # Runtime
 FROM node:20-alpine
@@ -19,7 +26,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/apps/api/package.json ./
 COPY --from=build /app/apps/api/dist ./dist
-RUN npm install --omit=dev
+COPY --from=build /app/node_modules ./node_modules
 EXPOSE 4000
 CMD ["node", "dist/index.js"]
 

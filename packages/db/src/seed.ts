@@ -9,6 +9,9 @@ async function main() {
     update: { name: 'Admin' },
     create: { email, name: 'Admin' },
   });
+  await prisma.auditLog.create({
+    data: { actorId: email, action: 'seed', resource: 'bootstrap', meta: { env: process.env.NODE_ENV || 'development' } as any },
+  }).catch(() => {});
 }
 
 main()

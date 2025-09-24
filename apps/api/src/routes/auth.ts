@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { prisma } from '@carenest/db';
 
 interface JwtPayloadLike {
   sub: string;
@@ -52,6 +53,8 @@ authRouter.post('/login', (req, res) => {
   }
   const userId = email;
   const token = jwt.sign({ sub: userId, email, roles: Array.isArray(roles) ? roles : [] } as any, config.jwtSecret, { expiresIn: '7d' });
+  // best-effort audit log (ignore errors if migrations not applied)
+  prisma.auditLog.create({ data: { actorId: userId, action: 'login', resource: 'auth', meta: { roles } as any } }).catch(() => {});
   res.json({ token });
 });
 
