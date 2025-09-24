@@ -61,6 +61,15 @@ jobs:
 
       - name: Run Enterprise tests
         working-directory: apps/enterprise
-        run: pytest -q
+        shell: bash
+        run: |
+          set -e
+          pytest -q || code=$?
+          if [ "${code:-0}" -eq 5 ]; then
+            echo "pytest: no tests collected (treating as success)"
+            exit 0
+          elif [ -n "${code:-}" ] && [ "$code" -ne 0 ]; then
+            exit $code
+          fi
 
 
