@@ -111,7 +111,7 @@ function syncOnce({ silent = false } = {}) {
     log('No origin remote found. Skipping.');
     return;
   }
-  // Single instance locks
+  // Single instance locks are used to prevent multiple instances of the script from running simultaneously.
   const lockPath = path.join(repoRoot, '.carenest-sync.lock');
   if (fs.existsSync(lockPath)) {
     const ageMs = Date.now() - fs.statSync(lockPath).mtimeMs;
