@@ -32,4 +32,13 @@ aiRouter.post('/plan', requireAuth(['admin']), async (req, res) => {
   }
 });
 
+// Return the current master prompt block for inspection/debugging
+aiRouter.get('/prompt', requireAuth(['admin']), async (_req, res) => {
+  const { masterBlock } = loadIdeMasterPrompt();
+  if (!masterBlock) {
+    return res.status(404).json({ error: 'Master prompt not found' });
+  }
+  return res.json({ masterBlock });
+});
+
 
