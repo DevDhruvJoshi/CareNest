@@ -29,6 +29,23 @@ echo "[+] Installing packages"
 sudo apt-get update -y
 sudo apt-get install -y autossh ufw fail2ban
 
+# Ensure SSH key exists for autossh per config
+KEY_DIR="$HOME/.ssh"
+PUB_KEY_PATH="${KEY_PATH}.pub"
+if [ ! -d "$KEY_DIR" ]; then
+  mkdir -p "$KEY_DIR"
+  chmod 700 "$KEY_DIR"
+fi
+if [ ! -f "${KEY_PATH}" ]; then
+  echo "[+] Generating SSH key for autossh at ${KEY_PATH}"
+  ssh-keygen -t rsa -b 4096 -N "" -f "${KEY_PATH}" >/dev/null 2>&1 || true
+  chmod 600 "${KEY_PATH}" || true
+fi
+if [ -f "${KEY_PATH}" ] && [ -f "${PUB_KEY_PATH}" ]; then
+  echo "[+] SSH public key (add this to VPS ~/.ssh/authorized_keys):"
+  cat "${PUB_KEY_PATH}"
+fi
+
 if [ "$SEC_UFW" = "true" ]; then
   echo "[+] Configuring UFW"
   sudo ufw --force reset
@@ -103,5 +120,24 @@ if [ "$SSH_ENABLED" = "true" ]; then
   sudo systemctl enable --now autossh-mummycare.service || true
 fi
 
+# Optional: secure SSHD per prompt guidance (idempotent edits)
+echo "[+] Hardening SSHD"
+if [ -f /etc/ssh/sshd_config ]; then
+  sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/g' /etc/ssh/sshd_config || true
+  sudo sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/g' /etc/ssh/sshd_config || true
+  sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/g' /etc/ssh/sshd_config || true
+  sudo systemctl restart ssh || sudo systemctl restart sshd || true
+fi
+
 echo "[+] Done"
+
+# Post-setup validation hints
+if [ "$SSH_ENABLED" = "true" ]; then
+  echo "[INFO] Validate tunnel from VPS host:"
+  echo "  curl -I http://localhost:$REMOTE_PORT || true"
+fi
+echo "[INFO] Validate local dashboard:"
+echo "  curl -I http://localhost:5000 || true"
+echo "[INFO] Check service status summaries:"
+echo "  systemctl --no-pager status mummycare autossh-mummycare | sed -n '1,50p' || true"
 
