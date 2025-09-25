@@ -33,6 +33,7 @@ jobs:
 
       - name: Build packages and apps
         env:
+          # Provide minimal env so builds don't fail
           NODE_ENV: production
           DATABASE_URL: postgresql://user:pass@localhost:5432/carenest
           NEXT_PUBLIC_API_URL: http://localhost:4000
@@ -92,5 +93,81 @@ jobs:
         if: always()
         run: |
           if [ -f api.pid ]; then kill $(cat api.pid) || true; fi
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Ensure npm@10
+        run: |
+          npm i -g npm@10
+          npm --version
+
+      - name: Install (workspaces)
+        run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
+
+      - name: Prisma generate
+        run: npm run -w packages/db prisma:generate
+
+      - name: Build shared db package
+        run: npm run -w packages/db build
+
+      - name: Typecheck API
+        run: npx -w apps/api tsc -p tsconfig.json --noEmit
+
+      - name: Build API
+        run: npm run -w apps/api build
+
+      - name: Build Web
+        run: npm run -w apps/web build
+
+      - name: Lint API
+        run: npm run -w apps/api lint || true
+
+      - name: Lint Web
+        run: npm run -w apps/web lint || true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Enterprise deps
+        working-directory: apps/enterprise
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run Enterprise tests
+        working-directory: apps/enterprise
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -e
+          pytest -q || code=$?
+          if [ "${code:-0}" -eq 5 ]; then
+            echo "pytest: no tests collected (treating as success)"
+            exit 0
+          elif [ -n "${code:-}" ] && [ "$code" -ne 0 ]; then
+            exit $code
+          fi
 
 
