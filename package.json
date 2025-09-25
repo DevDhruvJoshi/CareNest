@@ -16,7 +16,11 @@
     "db:generate": "npm run -w packages/db prisma:generate",
     "db:migrate": "npm run -w packages/db prisma:migrate",
     "db:seed": "npm run -w packages/db seed",
-    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed"
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed",
+    "sync:once": "node scripts/auto_sync.js --once --silent",
+    "sync:daemon": "node scripts/auto_sync.js --daemon --interval=60000 --silent",
+    "sync:setup": "node scripts/setup_sync_hooks.js",
+    "postinstall": "node scripts/setup_sync_hooks.js"
   },
   "engines": {
     "node": ">=20",

@@ -224,10 +224,4 @@ node scripts/api_smoke.mjs
 ## CI/CD
 
 - GitHub Actions: `.github/workflows/ci.yml` builds API & Web
-- CI triggers: all branches (push), PRs (any base), manual (workflow_dispatch)
-- Required check name: `build-and-test`
 
-## Contribution & Branch Policy
-
-- Please read `CONTRIBUTING.md` for flow: feature/* → PR→ `dev` → PR→ `main`
-- No direct pushes to `dev`/`main` (use PRs). Use Conventional Commits.
