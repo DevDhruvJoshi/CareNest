@@ -111,7 +111,7 @@ function syncOnce({ silent = false } = {}) {
     log('No origin remote found. Skipping.');
     return;
   }
-  // Single instance lock
+  // Single instance locks
   const lockPath = path.join(repoRoot, '.carenest-sync.lock');
   if (fs.existsSync(lockPath)) {
     const ageMs = Date.now() - fs.statSync(lockPath).mtimeMs;
