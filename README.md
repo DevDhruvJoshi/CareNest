@@ -99,6 +99,34 @@ curl http://localhost:5000/api/ssh-tunnel/cmd
   - Tokens: `INGEST_TOKEN` for Enterprise→API ingest, `READ_TOKEN` for read-only events
   - Alerts (optional): `ALERT_SMS_PROVIDER`, `ALERT_SMS_TWILIO_ACCOUNT_SID`, `ALERT_SMS_TWILIO_AUTH_TOKEN`, `ALERT_SMS_FROM`, `ALERT_EMAIL_SMTP_HOST`, `ALERT_EMAIL_SMTP_PORT`, `ALERT_EMAIL_SMTP_USER`, `ALERT_EMAIL_SMTP_PASS`
 
+#### Root .env template (optional)
+
+If you prefer a single root `.env`, create it with the following minimal keys (then each app will read from process env):
+
+```env
+# API
+PORT=4000
+NODE_ENV=development
+JWT_SECRET=change-me
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/carenest
+INGEST_TOKEN=dev-ingest-token
+READ_TOKEN=dev-read-token
+# Optional LLM
+# OPENAI_API_KEY=sk-...
+# OPENAI_MODEL=gpt-4o-mini
+# LLM_MOCK=true
+
+# Enterprise
+APP_ENV=local
+API_URL=http://localhost:4000
+PORT=5000
+
+# Web
+NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_ENTERPRISE_URL=http://localhost:5000
+NEXT_PUBLIC_READ_TOKEN=dev-read-token
+```
+
 ### Examples
 
 API `.env.local` (apps/api/.env.local):
