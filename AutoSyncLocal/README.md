@@ -57,4 +57,24 @@ git branch -r | findstr sync/
 - Nothing pushes: try `npm run sync:once` and check for network/offline. The tool will skip pushing when offline.
 - Stuck runs: remove lock file if present: `.carenest-sync.lock` in repo root.
 
+### CLI (custom)
+```
+# start debounced watch sync
+npx joshi start sync
+# or via npm script
+npm run joshi -- start sync
+
+# start 60s daemon
+npx joshi start daemon
+
+# stop background sync
+npx joshi stop sync
+
+# one-off sync now
+npx joshi once
+
+# status
+npx joshi status
+```
+
 
