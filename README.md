@@ -298,6 +298,8 @@ node scripts/api_smoke.mjs
 
 ### Notes
 
+PR checks: Merges into protected branches wait for CI (build + smoke) to pass.
+
 - CI uses Node 20 with npm workspaces; it runs a single install at repo root, then builds `packages/db`, `apps/api`, and `apps/web`.
 - Prisma reads `DATABASE_URL` at build/runtime. In Docker Compose, the API uses the `db` service URL.
 - Only `NEXT_PUBLIC_*` keys appear in the browser. Keep secrets server-side.
