@@ -290,7 +290,6 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
     interval = 1.0 / max(fps, 1)
     backoff = 1.0
     pose = None
-    hands = None
     onnx_session = None
     onnx_input_name = None
     onnx_last_fire = 0.0
@@ -304,10 +303,6 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
             pose = mp.solutions.pose.Pose(static_image_mode=False, model_complexity=0, enable_segmentation=False)
         except Exception:
             pose = None
-        try:
-            hands = mp.solutions.hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5, min_tracking_confidence=0.5)
-        except Exception:
-            hands = None
     # Optional ONNX fall model
     model_path = os.getenv('FALL_ONNX_MODEL')
     if model_path and ort is not None and Path(model_path).exists():
@@ -503,31 +498,6 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                                     last_fall_ts = now
                     except Exception:
                         pass
-                # MediaPipe Hands gesture detection (simple heuristics)
-                gesture_name = None
-                if hands is not None and frame_count % 3 == 0:
-                    try:
-                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        res_h = hands.process(rgb)
-                        if res_h and res_h.multi_hand_landmarks:
-                            # Heuristic: detect open palm vs closed (thumb to index distance)
-                            for hand_lms in res_h.multi_hand_landmarks:
-                                # landmarks indices per MediaPipe Hands
-                                # 4: thumb_tip, 8: index_tip, 12: middle_tip
-                                t = hand_lms.landmark[4]
-                                i = hand_lms.landmark[8]
-                                m = hand_lms.landmark[12]
-                                # compute pairwise distances in normalized coords
-                                ti = ((t.x - i.x)**2 + (t.y - i.y)**2) ** 0.5
-                                im = ((i.x - m.x)**2 + (i.y - m.y)**2) ** 0.5
-                                if ti > 0.12 and im > 0.10:
-                                    gesture_name = 'open_palm'
-                                    break
-                                elif ti < 0.05:
-                                    gesture_name = 'pinch_or_fist'
-                                    break
-                    except Exception:
-                        gesture_name = None
                 # post events to API
                 try:
                     cfg = load_config()
@@ -560,23 +530,6 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                             headers={"x-ingest-token": ingest},
                             timeout=1.5,
                         )
-                    if gesture_name:
-                        try:
-                            cfg = load_config()
-                            api = str(cfg.get('api', {}).get('base_url') or os.getenv('API_URL', 'http://localhost:4000'))
-                            ingest = str(cfg.get('api', {}).get('ingest_token') or os.getenv('INGEST_TOKEN', ''))
-                            requests.post(
-                                f"{api}/alerts/events",
-                                json={
-                                    "cameraId": cam_id,
-                                    "type": "gesture",
-                                    "details": {"name": gesture_name},
-                                },
-                                headers={"x-ingest-token": ingest},
-                                timeout=1.5,
-                            )
-                        except Exception:
-                            pass
                 except Exception:
                     pass
         except Exception:

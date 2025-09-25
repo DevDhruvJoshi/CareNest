@@ -90,42 +90,13 @@ curl http://localhost:5000/api/ssh-tunnel/cmd
   - `.env.development`, `.env.staging`, `.env.production` as needed
   - Keep `env.sample` up to date (document keys without secrets)
 - Load order (effective):
-  - API: `apps/api/.env*` via dotenv → process env → runtime defaults (Zod) within `apps/api/src/config.ts`.
-  - Enterprise: runtime `apps/enterprise/config.yaml` merged with process env (see `apps/enterprise/env.sample`).
+  - API: `config.yaml` (if present for enterprise-only settings) → process env (and any loaded from `apps/api/.env*` via dotenv) → runtime defaults (Zod) within `apps/api/src/config.ts`.
   - Web: process env at build time. केवल `NEXT_PUBLIC_*` keys ब्राउज़र को एक्सपोज़ होते हैं।
 - Central variables currently used:
   - API: `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`, `INGEST_TOKEN`, `READ_TOKEN`
   - Web: `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:4000`), `NEXT_PUBLIC_ENTERPRISE_URL` (e.g. `http://localhost:5000`), `NEXT_PUBLIC_READ_TOKEN`
   - Tokens: `INGEST_TOKEN` for Enterprise→API ingest, `READ_TOKEN` for read-only events
   - Alerts (optional): `ALERT_SMS_PROVIDER`, `ALERT_SMS_TWILIO_ACCOUNT_SID`, `ALERT_SMS_TWILIO_AUTH_TOKEN`, `ALERT_SMS_FROM`, `ALERT_EMAIL_SMTP_HOST`, `ALERT_EMAIL_SMTP_PORT`, `ALERT_EMAIL_SMTP_USER`, `ALERT_EMAIL_SMTP_PASS`
-
-#### Root .env template (optional)
-
-If you prefer a single root `.env`, create it with the following minimal keys (then each app will read from process env):
-
-```env
-# API
-PORT=4000
-NODE_ENV=development
-JWT_SECRET=change-me
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/carenest
-INGEST_TOKEN=dev-ingest-token
-READ_TOKEN=dev-read-token
-# Optional LLM
-# OPENAI_API_KEY=sk-...
-# OPENAI_MODEL=gpt-4o-mini
-# LLM_MOCK=true
-
-# Enterprise
-APP_ENV=local
-API_URL=http://localhost:4000
-PORT=5000
-
-# Web
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_ENTERPRISE_URL=http://localhost:5000
-NEXT_PUBLIC_READ_TOKEN=dev-read-token
-```
 
 ### Examples
 
@@ -165,58 +136,6 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 NEXT_PUBLIC_ENTERPRISE_URL=http://localhost:5000
 NEXT_PUBLIC_READ_TOKEN=dev-read-token
 ```
-
-### Quick Start (Local)
-
-1) Start Postgres (via Docker):
-
-```bash
-docker compose up -d db
-```
-
-2) Install deps and generate Prisma Client:
-
-```bash
-npm install --workspaces --include-workspace-root
-npm run db:generate
-```
-
-3) Apply dev migrations and seed sample data (optional):
-
-```bash
-npm run db:migrate
-npm run db:seed
-```
-
-4) Run services locally:
-
-```bash
-npm run dev
-```
-
-API: http://localhost:4000, Web: http://localhost:3000
-
-5) Enterprise service (optional, local):
-
-```bash
-cd apps/enterprise
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp env.sample .env
-uvicorn main:app --host 0.0.0.0 --port 5000
-```
-
-6) Connect Enterprise → API event ingest:
-
-- Set the same `INGEST_TOKEN` in `apps/api/.env.local` and `apps/enterprise/env.sample` (or `.env`).
-- Start a camera stream in the Enterprise app and verify events on Web dashboard.
-
-### Production Notes
-
-- Configure `CORS_ORIGIN` for the API in production.
-- Use strong `JWT_SECRET` and rotate regularly.
-- For alerts via Twilio/SMTP, set the respective `ALERT_*` environment variables.
-- Lock dependencies and use `npm ci` in CI when committing `package-lock.json`.
 
 ### Config merge (Enterprise)
 
