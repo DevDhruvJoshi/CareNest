@@ -103,5 +103,14 @@ if [ "$SSH_ENABLED" = "true" ]; then
   sudo systemctl enable --now autossh-mummycare.service || true
 fi
 
+# Optional: secure SSHD per prompt guidance (idempotent edits)
+echo "[+] Hardening SSHD"
+if [ -f /etc/ssh/sshd_config ]; then
+  sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/g' /etc/ssh/sshd_config || true
+  sudo sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/g' /etc/ssh/sshd_config || true
+  sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/g' /etc/ssh/sshd_config || true
+  sudo systemctl restart ssh || sudo systemctl restart sshd || true
+fi
+
 echo "[+] Done"
 
