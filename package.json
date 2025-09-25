@@ -21,7 +21,8 @@
     "sync:daemon": "node AutoSyncLocal/auto_sync.js --daemon --interval=60000 --silent",
     "sync:watch": "node AutoSyncLocal/auto_sync.js --watch --silent",
     "sync:setup": "node AutoSyncLocal/setup_hooks.js",
-    "postinstall": "node AutoSyncLocal/setup_hooks.js"
+    "postinstall": "node AutoSyncLocal/setup_hooks.js",
+    "joshi": "node bin/joshi.js"
   },
   "engines": {
     "node": ">=20",
