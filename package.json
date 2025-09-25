@@ -16,13 +16,7 @@
     "db:generate": "npm run -w packages/db prisma:generate",
     "db:migrate": "npm run -w packages/db prisma:migrate",
     "db:seed": "npm run -w packages/db seed",
-    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed",
-    "sync:once": "node AutoSyncLocal/auto_sync.js --once --silent",
-    "sync:daemon": "node AutoSyncLocal/auto_sync.js --daemon --interval=60000 --silent",
-    "sync:watch": "node AutoSyncLocal/auto_sync.js --watch --silent",
-    "sync:setup": "node AutoSyncLocal/setup_hooks.js",
-    "postinstall": "node AutoSyncLocal/setup_hooks.js",
-    "joshi": "node bin/joshi.js"
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed"
   },
   "engines": {
     "node": ">=20",
@@ -31,7 +25,6 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.7.0",
     "@typescript-eslint/parser": "^8.7.0",
-    "chokidar": "^3.6.0",
     "eslint": "^9.11.1",
     "prettier": "^3.3.3"
   },
