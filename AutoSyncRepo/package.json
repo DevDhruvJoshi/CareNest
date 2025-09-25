@@ -1,0 +1,21 @@
+{
+  "name": "autosync-local",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Per-developer background sync branch utility",
+  "license": "MIT",
+  "bin": {
+    "joshi": "bin/joshi.js"
+  },
+  "scripts": {
+    "sync:setup": "node setup_hooks.js",
+    "sync:once": "node auto_sync.js --once",
+    "sync:watch": "node auto_sync.js --watch --silent",
+    "sync:daemon": "node auto_sync.js --daemon --interval=60000 --silent"
+  },
+  "devDependencies": {
+    "chokidar": "^3.6.0"
+  }
+}
+
+
