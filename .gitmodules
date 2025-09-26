@@ -1,0 +1,3 @@
+[submodule "AutoSyncRepo"]
+	path = AutoSyncRepo
+	url = https://github.com/DevDhruvJoshi/AutoSync
