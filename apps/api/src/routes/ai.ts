@@ -42,3 +42,13 @@ aiRouter.get('/prompt', requireAuth(['admin']), async (_req, res) => {
 });
 
 
+// Alias endpoint for clarity: returns the same master prompt block
+aiRouter.get('/master-prompt', requireAuth(['admin']), async (_req, res) => {
+  const { masterBlock } = loadIdeMasterPrompt();
+  if (!masterBlock) {
+    return res.status(404).json({ error: 'Master prompt not found' });
+  }
+  return res.json({ masterBlock });
+});
+
+
