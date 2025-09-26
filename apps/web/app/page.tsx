@@ -17,6 +17,7 @@ export default async function HomePage() {
       <p style={{ fontSize: 20 }}>સિસ્ટમ ચાલુ છે. રિયલ-ટાઇમ હેલ્થ અપડેટ્સ નીચે દેખાશે.</p>
       <HealthPanel initial={health} />
       <CameraControls />
+      <ModelToggles />
       <AnalyticsAndSnapshot />
       <LiveVideo />
       <RecentGestures />
