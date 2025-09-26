@@ -50,7 +50,7 @@ function ensureMirrorClone(mirrorDir, originUrl) {
     run(`git clone ${originUrl} ${mirrorDir}`);
   }
 }
- 
+
 function ensureSyncBranch(mirrorDir, branchName) {
   tryRun(`git -C ${mirrorDir} fetch origin`);
   const branches = tryRun(`git -C ${mirrorDir} branch --list ${branchName}`);
