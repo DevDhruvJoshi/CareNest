@@ -229,6 +229,11 @@ def get_health_status():
         "postureScore": 0.8,
     }
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for load balancers"""
+    return {"status": "ok", "timestamp": time.time()}
+
 
 @app.get("/api/system-status")
 def get_system_status():
