@@ -9,13 +9,7 @@ import { requireAuth } from './auth';
 import { Router as ExpressRouter } from 'express';
 
 export const alertsRouter = Router();
-const ingestLimiter = rateLimit({ 
-  windowMs: 60_000, 
-  max: 120,
-  message: { error: 'Too many requests', retryAfter: 60 },
-  standardHeaders: true,
-  legacyHeaders: false
-});
+const ingestLimiter = rateLimit({ windowMs: 60_000, max: 120 });
 
 alertsRouter.post('/', async (req, res) => {
   const { subject, message, to, channel } = req.body as {
@@ -66,51 +60,6 @@ alertsRouter.post('/events', ingestLimiter, async (req, res) => {
   const { cameraId, type, details } = req.body as { cameraId?: string; type?: string; details?: unknown };
   if (!cameraId || !type) return res.status(400).json({ error: 'cameraId and type required' });
   const ev = await prisma.cameraEvent.create({ data: { cameraId, type, details: (details as any) || undefined } });
-
-  // Best-effort alert escalation hooks for critical events
-  try {
-    const lower = String(type).toLowerCase();
-    const conf = typeof (details as any)?.confidence === 'number' ? Number((details as any).confidence) : undefined;
-    const yoloConf = typeof (details as any)?.yoloPersonConfidence === 'number' ? Number((details as any).yoloPersonConfidence) : conf;
-    const threshold = Number(process.env.PERSON_ALERT_MIN_CONF || 0.6);
-    if (lower === 'fall') {
-      await sendAlert({
-        channel: (process.env.FALL_ALERT_CHANNEL as any) || 'sms',
-        to: process.env.FALL_ALERT_TO || undefined,
-        subject: 'Fall detected',
-        message: `Fall detected on ${cameraId}${yoloConf ? ` (person conf ${yoloConf.toFixed(2)})` : ''}`,
-      }).catch(() => {});
-      // Optional voice call escalation
-      if (String(process.env.FALL_CALL_ENABLED || '').toLowerCase() === 'true') {
-        await sendAlert({ channel: 'call', to: process.env.FALL_CALL_TO || process.env.FALL_ALERT_TO, message: 'Emergency: fall detected at CareNest.' }).catch(() => {});
-      }
-    } else if (lower === 'person' && yoloConf !== undefined && yoloConf >= threshold) {
-      await sendAlert({
-        channel: (process.env.PERSON_ALERT_CHANNEL as any) || 'log',
-        to: process.env.PERSON_ALERT_TO || undefined,
-        subject: 'Person detected',
-        message: `Person detected on ${cameraId} (conf ${yoloConf.toFixed(2)})`,
-      }).catch(() => {});
-    } else if (lower === 'gesture') {
-      const name = String((details as any)?.name || '').toLowerCase();
-      const mapRaw = process.env.GESTURE_ALERT_MAP || '';
-      // format: "open_palm:sms:+911234567890, pinch_or_fist:log"
-      if (name && mapRaw) {
-        const entries = mapRaw.split(',').map((s) => s.trim()).filter(Boolean);
-        for (const e of entries) {
-          const parts = e.split(':').map((s) => s.trim());
-          const g = (parts[0] || '').toLowerCase();
-          if (g && g === name) {
-            const ch = (parts[1] as any) || 'log';
-            const to = parts[2];
-            await sendAlert({ channel: ch, to, subject: 'Gesture detected', message: `Gesture ${name} on ${cameraId}` }).catch(() => {});
-            break;
-          }
-        }
-      }
-    }
-  } catch {}
-
   return res.status(201).json(ev);
 });
 
