@@ -16,6 +16,7 @@ export default async function HomePage() {
       <h1 style={{ fontSize: 36 }}>કેરનેસ્ટ (CareNest)</h1>
       <p style={{ fontSize: 20 }}>સિસ્ટમ ચાલુ છે. રિયલ-ટાઇમ હેલ્થ અપડેટ્સ નીચે દેખાશે.</p>
       <HealthPanel initial={health} />
+      <CameraControls />
       <AnalyticsAndSnapshot />
       <LiveVideo />
       <RecentGestures />
@@ -235,6 +236,55 @@ function RecentGestures() {
           </div>
         ))}
         {items.length === 0 && (<div style={{ opacity: 0.8 }}>કોઈ gesture ઇવેન્ટ નથી.</div>)}
+      </div>
+    </section>
+  );
+}
+
+
+function CameraControls() {
+  if (typeof window === 'undefined') return null as any;
+  const React = require('react') as typeof import('react');
+  const [camId, setCamId] = React.useState('cam1');
+  const [rtspUrl, setRtspUrl] = React.useState('rtsp://example');
+  const [list, setList] = React.useState<any[]>([]);
+  const base = (process.env.NEXT_PUBLIC_ENTERPRISE_URL || 'http://localhost:5000').replace(/\/$/, '');
+
+  const start = async () => {
+    await fetch(`${base}/api/camera/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: camId, url: rtspUrl }) }).catch(() => {});
+    load();
+  };
+  const stop = async () => {
+    await fetch(`${base}/api/camera/stop`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: camId }) }).catch(() => {});
+    load();
+  };
+  const load = async () => {
+    try {
+      const res = await fetch(`${base}/api/camera`, { cache: 'no-store' });
+      const data = await res.json();
+      setList(data?.items || []);
+    } catch {}
+  };
+
+  React.useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, []);
+
+  return (
+    <section style={{ marginTop: 24 }}>
+      <h2 style={{ fontSize: 28 }}>કેમેરા કંટ્રોલ</h2>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input value={camId} onChange={(e: any) => setCamId(e.target.value)} placeholder="cam id" style={{ fontSize: 16, padding: 8 }} />
+        <input value={rtspUrl} onChange={(e: any) => setRtspUrl(e.target.value)} placeholder="rtsp url" style={{ fontSize: 16, padding: 8, minWidth: 320 }} />
+        <button onClick={start} style={{ fontSize: 16, padding: '8px 12px' }}>શરૂ કરો</button>
+        <button onClick={stop} style={{ fontSize: 16, padding: '8px 12px' }}>બંધ કરો</button>
+      </div>
+      <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+        {list.map((c) => (
+          <div key={c.id} style={{ background: '#111', padding: 12, borderRadius: 8 }}>
+            <div style={{ fontSize: 16 }}>{c.id}</div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>છેલ્લો ફ્રેમ: {c.lastFrameAgoSec ? `${Math.round(c.lastFrameAgoSec)}s પહેલા` : 'N/A'}</div>
+          </div>
+        ))}
+        {list.length === 0 && <div style={{ opacity: 0.8 }}>કોઇ કેમેરા ચાલી રહ્યો નથી.</div>}
       </div>
     </section>
   );
