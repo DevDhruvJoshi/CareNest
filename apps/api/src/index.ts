@@ -90,6 +90,11 @@ app.get('/', (_req, res) => {
   res.json({ name: 'CareNest API', status: 'ok' });
 });
 
+// Health check endpoint for load balancers
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.use((req, res) => {
   res.status(404).json({ error: 'Not Found', path: req.path });
 });

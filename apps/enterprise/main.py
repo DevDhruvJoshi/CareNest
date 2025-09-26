@@ -229,6 +229,11 @@ def get_health_status():
         "postureScore": 0.8,
     }
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for load balancers"""
+    return {"status": "ok", "timestamp": time.time()}
+
 
 @app.get("/api/system-status")
 def get_system_status():
@@ -281,6 +286,15 @@ _last_frames: Dict[str, Any] = {}
 _last_health: Dict[str, float] = {}
 _hls_procs: Dict[str, subprocess.Popen] = {}
 
+# Runtime toggles (can be changed via API)
+_toggles = {
+    'face_blur': True,
+    'pose_enabled': True,
+    'hands_enabled': True,
+    'yolo_enabled': os.getenv('YOLO_ENABLED', 'false').lower() in ('1', 'true', 'yes'),
+    'onnx_enabled': bool(os.getenv('FALL_ONNX_MODEL')),
+}
+
 
 def _process_stream(cam_id: str, url: str, fps: int = 10):
     if cv2 is None:
@@ -299,7 +313,7 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
     yolo_last_infer = 0.0
     yolo_interval = 0.5  # seconds between YOLO inferences
     yolo_person_conf = 0.0
-    if mp is not None:
+    if mp is not None and _toggles.get('pose_enabled'):
         try:
             pose = mp.solutions.pose.Pose(static_image_mode=False, model_complexity=0, enable_segmentation=False)
         except Exception:
@@ -310,7 +324,7 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
             hands = None
     # Optional ONNX fall model
     model_path = os.getenv('FALL_ONNX_MODEL')
-    if model_path and ort is not None and Path(model_path).exists():
+    if _toggles.get('onnx_enabled') and model_path and ort is not None and Path(model_path).exists():
         try:
             providers = ['CPUExecutionProvider']
             onnx_session = ort.InferenceSession(model_path, providers=providers)
@@ -320,7 +334,7 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
 
     # Optional YOLO person detector (requires ultralytics + weights available)
     yolo_weights = os.getenv('YOLO_MODEL', 'yolov8n.pt')
-    yolo_enabled = (os.getenv('YOLO_ENABLED', 'false').lower() in ('1', 'true', 'yes'))
+    yolo_enabled = _toggles.get('yolo_enabled')
     yolo_min_conf = float(os.getenv('YOLO_MIN_CONF', '0.25'))
     if yolo_enabled and YOLO is not None:
         try:
@@ -357,9 +371,9 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
         # Face blurring if enabled
         try:
             cfg = load_config()
-            blur_enabled = bool(cfg.get('privacy', {}).get('face_blur', False))
+            blur_enabled = bool(cfg.get('privacy', {}).get('face_blur', False)) or _toggles.get('face_blur', False)
         except Exception:
-            blur_enabled = False
+            blur_enabled = _toggles.get('face_blur', False)
         if blur_enabled and cv2 is not None:
             try:
                 gray_face = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -414,7 +428,7 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                 # MediaPipe pose enhancement: consider nose-to-hip delta + shoulder angle for fall
                 # and combine with motion
                 pose_fall = False
-                if pose is not None and frame_count % 5 == 0:
+                if pose is not None and _toggles.get('pose_enabled') and frame_count % 5 == 0:
                     try:
                         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         res = pose.process(rgb)
@@ -438,7 +452,7 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
 
                 # YOLO person detection (event emission with confidence)
                 person_event_emitted = False
-                if yolo_model is not None and (now - yolo_last_infer) > yolo_interval:
+                if yolo_model is not None and _toggles.get('yolo_enabled') and (now - yolo_last_infer) > yolo_interval:
                     try:
                         yolo_last_infer = now
                         img = frame
@@ -477,7 +491,7 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
 
                 # mediapipe pose heuristic (if available) every 5th frame
                 frame_count += 1
-                if pose is not None and frame_count % 5 == 0:
+                if pose is not None and _toggles.get('pose_enabled') and frame_count % 5 == 0:
                     try:
                         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         res = pose.process(rgb)
@@ -505,7 +519,7 @@ def _process_stream(cam_id: str, url: str, fps: int = 10):
                         pass
                 # MediaPipe Hands gesture detection (simple heuristics)
                 gesture_name = None
-                if hands is not None and frame_count % 3 == 0:
+                if hands is not None and _toggles.get('hands_enabled') and frame_count % 3 == 0:
                     try:
                         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         res_h = hands.process(rgb)
@@ -807,4 +821,36 @@ def list_cameras():
             'lastFrameAgoSec': (now - (st.last_frame_ts or 0)) if st.last_frame_ts else None,
         })
     return {'items': out}
+
+
+#########################
+# Feature toggles API    #
+#########################
+
+class ToggleSetReq(BaseModel):
+    face_blur: Optional[bool] = None
+    pose_enabled: Optional[bool] = None
+    hands_enabled: Optional[bool] = None
+    yolo_enabled: Optional[bool] = None
+    onnx_enabled: Optional[bool] = None
+
+
+@app.get('/api/toggles')
+def get_toggles():
+    return { **_toggles }
+
+
+@app.post('/api/toggles')
+def set_toggles(req: ToggleSetReq):
+    if req.face_blur is not None:
+        _toggles['face_blur'] = bool(req.face_blur)
+    if req.pose_enabled is not None:
+        _toggles['pose_enabled'] = bool(req.pose_enabled)
+    if req.hands_enabled is not None:
+        _toggles['hands_enabled'] = bool(req.hands_enabled)
+    if req.yolo_enabled is not None:
+        _toggles['yolo_enabled'] = bool(req.yolo_enabled)
+    if req.onnx_enabled is not None:
+        _toggles['onnx_enabled'] = bool(req.onnx_enabled)
+    return { **_toggles }
 
