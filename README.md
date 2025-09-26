@@ -78,7 +78,7 @@ curl http://localhost:5000/api/ssh-tunnel/cmd
 
 - API (`apps/api`): `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`, `INGEST_TOKEN`, `READ_TOKEN`
 - Web (`apps/web`): `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_ENTERPRISE_URL`, `NEXT_PUBLIC_READ_TOKEN`
- - API LLM (optional): `OPENAI_API_KEY`, `OPENAI_MODEL` (default: `gpt-4o-mini`)
+ - API LLM (optional): `OPENAI_API_KEY`, `OPENAI_MODEL` (default: `gpt-4o-mini`), `LLM_MOCK` (true to bypass external calls)
 - Alerts escalation (optional): `ALERT_ESCALATION_RECIPIENTS`
 - Samples: `apps/api/env.sample`, `apps/web/env.sample`
 
@@ -294,6 +294,8 @@ node scripts/api_smoke.mjs
 ```
 
 - Response: `{ plan: string }` generated using `Prompts/IDE_AI_IMPLEMENTATION_PROMPT.md` master prompt.
+
+- Inspect master prompt (admin): `GET /ai/master-prompt` → `{ masterBlock }`
 ```
 
 ### Notes
