@@ -18,6 +18,7 @@ export default async function HomePage() {
       <HealthPanel initial={health} />
       <AnalyticsAndSnapshot />
       <LiveVideo />
+      <RecentGestures />
       <AlertsTimeline />
     </main>
   );
@@ -148,6 +149,7 @@ function LiveVideo() {
   const React = require('react') as typeof import('react');
   const [camId, setCamId] = React.useState('cam1');
   const [m3u8, setM3u8] = React.useState<string | null>(null);
+  const [analytics, setAnalytics] = React.useState<any>(null);
   const base = (process.env.NEXT_PUBLIC_ENTERPRISE_URL || 'http://localhost:5000').replace(/\/$/, '');
 
   const fetchHls = async () => {
@@ -158,6 +160,19 @@ function LiveVideo() {
     } catch {}
   };
 
+  const loadAnalytics = async () => {
+    try {
+      const res = await fetch(`${base}/api/health-analytics`, { cache: 'no-store' });
+      setAnalytics(await res.json());
+    } catch {}
+  };
+
+  React.useEffect(() => {
+    const t = setInterval(loadAnalytics, 3000);
+    loadAnalytics();
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <section style={{ marginTop: 24 }}>
       <h2 style={{ fontSize: 28 }}>લાઇવ વિડિયો</h2>
@@ -166,14 +181,61 @@ function LiveVideo() {
         <button onClick={fetchHls} style={{ fontSize: 16, padding: '8px 12px' }}>સ્ટ્રીમ URL મેળવો</button>
       </div>
       {m3u8 ? (
-        <video
-          controls
-          style={{ marginTop: 12, width: '100%', maxWidth: 720, background: '#111' }}
-          src={m3u8}
-        />
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <video
+            controls
+            style={{ marginTop: 12, width: '100%', maxWidth: 720, background: '#111' }}
+            src={m3u8}
+          />
+          {analytics?.anyFall ? (
+            <div style={{ position: 'absolute', top: 8, left: 8, background: '#b30000', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700 }}>
+              FALL
+            </div>
+          ) : analytics?.anyMotion ? (
+            <div style={{ position: 'absolute', top: 8, left: 8, background: '#b38f00', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700 }}>
+              MOTION
+            </div>
+          ) : null}
+        </div>
       ) : (
         <div style={{ opacity: 0.8, marginTop: 8 }}>HLS તૈયાર નથી.</div>
       )}
+    </section>
+  );
+}
+
+
+function RecentGestures() {
+  if (typeof window === 'undefined') return null as any;
+  const React = require('react') as typeof import('react');
+  const [items, setItems] = React.useState<any[]>([]);
+  const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+  const readToken = process.env.NEXT_PUBLIC_READ_TOKEN;
+
+  const load = async () => {
+    try {
+      const url = new URL(base + '/alerts/events');
+      url.searchParams.set('type', 'gesture');
+      const res = await fetch(url.toString(), { headers: readToken ? { 'x-read-token': readToken } : {} as any });
+      const data = await res.json();
+      if (data?.items) setItems(data.items);
+    } catch {}
+  };
+
+  React.useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, []);
+
+  return (
+    <section style={{ marginTop: 24 }}>
+      <h2 style={{ fontSize: 28 }}>જેશ્ચર્સ</h2>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {items.slice(0, 10).map((e) => (
+          <div key={e.id} style={{ background: '#111', padding: 12, borderRadius: 8 }}>
+            <div style={{ fontSize: 16 }}>{e.type} — {e.details?.name || 'unknown'}</div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>{new Date(e.createdAt).toLocaleString()}</div>
+          </div>
+        ))}
+        {items.length === 0 && (<div style={{ opacity: 0.8 }}>કોઈ gesture ઇવેન્ટ નથી.</div>)}
+      </div>
     </section>
   );
 }
