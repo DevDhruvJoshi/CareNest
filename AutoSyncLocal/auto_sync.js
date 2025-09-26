@@ -34,9 +34,14 @@ function getRepoRoot() {
   try { return run('git rev-parse --show-toplevel'); } catch { return process.cwd(); }
 }
 
-function getOriginUrl() {
-  const url = tryRun('git config --get remote.origin.url');
-  return url;
+function getSyncRemoteUrl() {
+  // Priority: explicit URL via env -> named remote via env -> 'sync' remote -> 'origin'
+  const explicitUrl = process.env.SYNC_REMOTE_URL || process.env.AUTOSYNC_REMOTE_URL;
+  if (explicitUrl) return explicitUrl;
+  const remoteName = process.env.SYNC_REMOTE || process.env.AUTOSYNC_REMOTE || 'sync';
+  const namedUrl = tryRun(`git config --get remote.${remoteName}.url`);
+  if (namedUrl) return namedUrl;
+  return tryRun('git config --get remote.origin.url');
 }
 
 function ensureMirrorClone(mirrorDir, originUrl) {
@@ -106,9 +111,9 @@ function copyDir(src, dst, repoRoot) {
 function syncOnce({ silent = false } = {}) {
   global.__silent = silent;
   const repoRoot = getRepoRoot();
-  const originUrl = getOriginUrl();
+  const originUrl = getSyncRemoteUrl();
   if (!originUrl) {
-    log('No origin remote found. Skipping.');
+    log('No remote found for sync. Skipping.');
     return;
   }
   // Single instance locks are used to prevent multiple instances of the script from running simultaneously.
