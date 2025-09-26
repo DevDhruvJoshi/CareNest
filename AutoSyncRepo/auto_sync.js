@@ -34,8 +34,7 @@ function getRepoRoot() {
   try { return run('git rev-parse --show-toplevel'); } catch { return process.cwd(); }
 }
 
-function getSyncRemoteUrl() {
-  // Revert to original behavior: always use origin remote URL
+function getOriginUrl() {
   return tryRun('git config --get remote.origin.url');
 }
 
@@ -102,7 +101,7 @@ function copyDir(src, dst, repoRoot) {
 function syncOnce({ silent = false } = {}) {
   global.__silent = silent;
   const repoRoot = getRepoRoot();
-  const originUrl = getSyncRemoteUrl();
+  const originUrl = getOriginUrl();
   if (!originUrl) { log('No origin remote found. Skipping.'); return; }
   const lockPath = path.join(repoRoot, '.carenest-sync.lock');
   if (fs.existsSync(lockPath)) {
