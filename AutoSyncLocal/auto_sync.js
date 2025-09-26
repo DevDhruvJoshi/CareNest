@@ -41,7 +41,9 @@ function getSyncRemoteUrl() {
   const remoteName = process.env.SYNC_REMOTE || process.env.AUTOSYNC_REMOTE || 'sync';
   const namedUrl = tryRun(`git config --get remote.${remoteName}.url`);
   if (namedUrl) return namedUrl;
-  return tryRun('git config --get remote.origin.url');
+  const allowOrigin = process.env.AUTOSYNC_ALLOW_ORIGIN === '1';
+  if (allowOrigin) return tryRun('git config --get remote.origin.url');
+  return '';
 }
 
 function ensureMirrorClone(mirrorDir, originUrl) {
