@@ -9,7 +9,13 @@ import { requireAuth } from './auth';
 import { Router as ExpressRouter } from 'express';
 
 export const alertsRouter = Router();
-const ingestLimiter = rateLimit({ windowMs: 60_000, max: 120 });
+const ingestLimiter = rateLimit({ 
+  windowMs: 60_000, 
+  max: 120,
+  message: { error: 'Too many requests', retryAfter: 60 },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 alertsRouter.post('/', async (req, res) => {
   const { subject, message, to, channel } = req.body as {
