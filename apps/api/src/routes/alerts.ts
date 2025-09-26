@@ -60,6 +60,34 @@ alertsRouter.post('/events', ingestLimiter, async (req, res) => {
   const { cameraId, type, details } = req.body as { cameraId?: string; type?: string; details?: unknown };
   if (!cameraId || !type) return res.status(400).json({ error: 'cameraId and type required' });
   const ev = await prisma.cameraEvent.create({ data: { cameraId, type, details: (details as any) || undefined } });
+
+  // Best-effort alert escalation hooks for critical events
+  try {
+    const lower = String(type).toLowerCase();
+    const conf = typeof (details as any)?.confidence === 'number' ? Number((details as any).confidence) : undefined;
+    const yoloConf = typeof (details as any)?.yoloPersonConfidence === 'number' ? Number((details as any).yoloPersonConfidence) : conf;
+    const threshold = Number(process.env.PERSON_ALERT_MIN_CONF || 0.6);
+    if (lower === 'fall') {
+      await sendAlert({
+        channel: (process.env.FALL_ALERT_CHANNEL as any) || 'sms',
+        to: process.env.FALL_ALERT_TO || undefined,
+        subject: 'Fall detected',
+        message: `Fall detected on ${cameraId}${yoloConf ? ` (person conf ${yoloConf.toFixed(2)})` : ''}`,
+      }).catch(() => {});
+      // Optional voice call escalation
+      if (String(process.env.FALL_CALL_ENABLED || '').toLowerCase() === 'true') {
+        await sendAlert({ channel: 'call', to: process.env.FALL_CALL_TO || process.env.FALL_ALERT_TO, message: 'Emergency: fall detected at CareNest.' }).catch(() => {});
+      }
+    } else if (lower === 'person' && yoloConf !== undefined && yoloConf >= threshold) {
+      await sendAlert({
+        channel: (process.env.PERSON_ALERT_CHANNEL as any) || 'log',
+        to: process.env.PERSON_ALERT_TO || undefined,
+        subject: 'Person detected',
+        message: `Person detected on ${cameraId} (conf ${yoloConf.toFixed(2)})`,
+      }).catch(() => {});
+    }
+  } catch {}
+
   return res.status(201).json(ev);
 });
 
