@@ -76,7 +76,8 @@ curl http://localhost:5000/api/ssh-tunnel/cmd
 
 ## Environment
 
-- API (`apps/api`): `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`, `INGEST_TOKEN`, `READ_TOKEN`
+- API (`apps/api`): `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`, `INGEST_TOKEN`, `READ_TOKEN`, `PERSON_ALERT_MIN_CONF` (default 0.6), `FALL_ALERT_CHANNEL` (sms|email|call|log), `FALL_ALERT_TO`, `FALL_CALL_ENABLED` (true|false), `FALL_CALL_TO`, `PERSON_ALERT_CHANNEL`, `PERSON_ALERT_TO`
+ - Gesture mapping: `GESTURE_ALERT_MAP` (e.g. `open_palm:sms:+911234567890,pinch_or_fist:log`)
 - Web (`apps/web`): `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_ENTERPRISE_URL`, `NEXT_PUBLIC_READ_TOKEN`
  - API LLM (optional): `OPENAI_API_KEY`, `OPENAI_MODEL` (default: `gpt-4o-mini`), `LLM_MOCK` (true to bypass external calls)
 - Alerts escalation (optional): `ALERT_ESCALATION_RECIPIENTS`
@@ -136,6 +137,22 @@ PORT=4000
 NODE_ENV=development
 JWT_SECRET=dev-secret
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/carenest
+# Ingest/read tokens
+INGEST_TOKEN=dev-ingest-token
+READ_TOKEN=dev-read-token
+
+# Alert escalation for critical events
+PERSON_ALERT_MIN_CONF=0.6
+FALL_ALERT_CHANNEL=sms
+FALL_ALERT_TO=+911234567890
+FALL_CALL_ENABLED=false
+# FALL_CALL_TO=+911234567890
+# PERSON_ALERT_CHANNEL=log
+# PERSON_ALERT_TO=+911234567890
+
+# Gesture → alert mapping
+# Format: gestureName:channel[:to] comma-separated
+GESTURE_ALERT_MAP=open_palm:sms:+911234567890,pinch_or_fist:log
 # Alerts (optional)
 # ALERT_SMS_PROVIDER=twilio
 # ALERT_SMS_TWILIO_ACCOUNT_SID=...
@@ -165,6 +182,26 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 NEXT_PUBLIC_ENTERPRISE_URL=http://localhost:5000
 NEXT_PUBLIC_READ_TOKEN=dev-read-token
 ```
+
+### Models (YOLO/ONNX) Setup
+
+- Enable YOLO person detection in Enterprise by setting:
+
+```env
+# apps/enterprise/.env
+YOLO_ENABLED=true
+YOLO_MODEL=yolov8n.pt
+YOLO_MIN_CONF=0.25
+```
+
+- Optional ONNX fall model:
+
+```env
+# apps/enterprise/.env
+FALL_ONNX_MODEL=./models/fall.onnx
+```
+
+- Person/fall events are posted to API `/alerts/events` with `x-ingest-token`. API can auto‑escalate using the envs above.
 
 ### Quick Start (Local)
 
