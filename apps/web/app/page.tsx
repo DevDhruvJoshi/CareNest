@@ -292,3 +292,47 @@ function CameraControls() {
 }
 
 
+function ModelToggles() {
+  if (typeof window === 'undefined') return null as any;
+  const React = require('react') as typeof import('react');
+  const [toggles, setToggles] = React.useState<any>({});
+  const base = (process.env.NEXT_PUBLIC_ENTERPRISE_URL || 'http://localhost:5000').replace(/\/$/, '');
+
+  const load = async () => {
+    try {
+      const res = await fetch(`${base}/api/toggles`, { cache: 'no-store' });
+      const data = await res.json();
+      setToggles(data || {});
+    } catch {}
+  };
+
+  const set = async (key: string, value: boolean) => {
+    try {
+      const res = await fetch(`${base}/api/toggles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: value }) });
+      const data = await res.json();
+      setToggles(data || {});
+    } catch {}
+  };
+
+  React.useEffect(() => { load(); }, []);
+
+  return (
+    <section style={{ marginTop: 24 }}>
+      <h2 style={{ fontSize: 28 }}>મોડેલ ટોગલ્સ</h2>
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        {Object.entries(toggles).map(([k, v]) => (
+          <div key={k} style={{ background: '#111', padding: 12, borderRadius: 8 }}>
+            <div style={{ fontSize: 16, marginBottom: 8 }}>{k}</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={Boolean(v)} onChange={(e: any) => set(k, e.target.checked)} />
+              <span style={{ fontSize: 14 }}>{Boolean(v) ? 'ON' : 'OFF'}</span>
+            </label>
+          </div>
+        ))}
+        {Object.keys(toggles).length === 0 && <div style={{ opacity: 0.8 }}>કોઇ ટોગલ લોડ નથી થયો.</div>}
+      </div>
+    </section>
+  );
+}
+
+
